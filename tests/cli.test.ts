@@ -110,6 +110,17 @@ describe('runCli', () => {
     expect(stderr.value).toMatch(/missing required argument 'input'/u);
   });
 
+  test('prints help to stdout', async () => {
+    const stdout = new MemoryStream();
+    const stderr = new MemoryStream();
+
+    const exitCode = await runCli(['node', 'yamdown', '--help'], { stderr, stdout });
+
+    expect(exitCode).toBe(0);
+    expect(stdout.value).toContain('Usage: yamdown [options] <input>');
+    expect(stderr.value).toBe('');
+  });
+
   test('returns a friendly error for missing files', async () => {
     const missing = join(dir, 'missing.yaml');
     const stderr = new MemoryStream();
@@ -121,5 +132,20 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(1);
     expect(stderr.value).toBe(`File not found: ${missing}\n`);
+  });
+
+  test('distinguishes a missing output directory from a missing input file', async () => {
+    const input = join(dir, 'input.yaml');
+    const output = join(dir, 'missing', 'output.md');
+    const stderr = new MemoryStream();
+    await writeFile(input, 'blocks:\n  - p: Saved\n', 'utf8');
+
+    const exitCode = await runCli(['node', 'yamdown', input, '--output', output], {
+      stderr,
+      stdout: new MemoryStream()
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.value).toBe(`Output directory not found for: ${output}\n`);
   });
 });

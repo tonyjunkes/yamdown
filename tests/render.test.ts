@@ -163,4 +163,9 @@ describe('renderInline', () => {
   test('protects multiline structured text from block Markdown syntax', () => {
     expect(renderInline({ type: 'text', value: 'Title\n===\n    indented' })).toBe('Title\n\\===\n&#32;   indented');
   });
+
+  test('protects structured text from thematic break syntax', () => {
+    expect(renderInline({ type: 'text', value: '---' })).toBe('\\---');
+    expect(renderInline({ type: 'text', value: '-- -' })).toBe('\\-- -');
+  });
 });

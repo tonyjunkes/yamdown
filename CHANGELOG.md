@@ -1,0 +1,49 @@
+# Changelog
+
+All notable changes to Yamdown are recorded here. This project follows
+[Semantic Versioning](https://semver.org/).
+
+## 0.3.0 - 2026-06-19
+
+### Added
+
+- Official mdast parsing through `mdast-util-from-markdown`.
+- GFM support for tables, task lists, autolinks, strikethrough, and footnotes in
+  generated mdast trees.
+- YAML frontmatter nodes and generated-Markdown source positions in mdast
+  output.
+- Package smoke coverage for the installed `toMdast` API.
+
+### Changed
+
+- `toMdast` now accepts YAML source or a document object plus optional render
+  options and returns an official `mdast.Root`.
+- Raw Markdown fields are interpreted semantically in mdast output, while
+  structured text remains literal.
+
+### Removed
+
+- The local `MdastRoot`, `MdastBlock`, and `MdastInline` compatibility types.
+  Import official types from `mdast` instead.
+
+## 0.2.0 - 2026-06-18
+
+### Added
+
+- Deterministic YAML-to-Markdown rendering for headings, paragraphs, lists,
+  code, blockquotes, thematic breaks, tables, HTML, and frontmatter.
+- Raw Markdown and safely escaped structured inline authoring modes.
+- Context-aware structured text, URL, title, image, and inline-code escaping.
+- YAML source ranges, validation paths, and CLI code-frame diagnostics.
+- Structured heading children and the initial mdast-compatible conversion API.
+- Library, CLI, package, fixture, and installed-tarball test coverage.
+
+### Changed
+
+- Package entrypoints now match the generated ESM `.mjs` and `.d.mts` files.
+- Package metadata and private, dry-run-only packaging safeguards were added.
+
+### Removed
+
+- The unused top-level document `title` property. Use frontmatter for metadata
+  or an explicit heading block for rendered titles.

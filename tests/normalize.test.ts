@@ -114,9 +114,20 @@ describe('normalizeDocument', () => {
     });
   });
 
-  test('rejects extra and conflicting keys on shorthand blocks', () => {
-    expect(() => normalizeDocument({ blocks: [{ h1: 'Title', typo: true }] })).toThrow(YamlMarkdownValidationError);
+  test.each([
+    ['heading', { h1: 'Title', typo: true }],
+    ['paragraph', { p: 'Body', typo: true }],
+    ['unordered list', { ul: [], typo: true }],
+    ['ordered list', { ol: [], typo: true }],
+    ['code', { code: 'value', typo: true }],
+    ['blockquote', { quote: [], typo: true }],
+    ['thematic break', { hr: true, typo: true }],
+    ['HTML', { html: '<br>', typo: true }]
+  ])('rejects extra keys on %s shorthand blocks', (_label, block) => {
+    expect(() => normalizeDocument({ blocks: [block] })).toThrow(YamlMarkdownValidationError);
+  });
+
+  test('rejects conflicting shorthand keys', () => {
     expect(() => normalizeDocument({ blocks: [{ h1: 'Title', p: 'Body' }] })).toThrow(YamlMarkdownValidationError);
-    expect(() => normalizeDocument({ blocks: [{ code: 'value', type: 'code' }] })).toThrow(YamlMarkdownValidationError);
   });
 });

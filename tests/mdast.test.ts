@@ -1,172 +1,159 @@
+import type { Root } from 'mdast';
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import { frontmatterFromMarkdown } from 'mdast-util-frontmatter';
+import { gfmFromMarkdown } from 'mdast-util-gfm';
+import { frontmatter } from 'micromark-extension-frontmatter';
+import { gfm } from 'micromark-extension-gfm';
 import { describe, expect, test } from 'vitest';
-import { toMdast } from '../src/index.js';
+import { renderMarkdown, toMdast } from '../src/index.js';
 
 describe('toMdast', () => {
-  test('converts block nodes', () => {
-    expect(
-      toMdast({
-        blocks: [
-          { type: 'heading', depth: 2, text: 'Title' },
-          { type: 'paragraph', text: 'Body' },
-          { type: 'blockquote', blocks: [{ type: 'paragraph', text: 'Nested quote' }] },
-          { type: 'thematicBreak' },
-          { type: 'html', value: '<br>' }
-        ]
-      })
-    ).toEqual({
-      type: 'root',
-      children: [
-        { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Title' }] },
-        { type: 'paragraph', children: [{ type: 'text', value: 'Body' }] },
-        {
-          type: 'blockquote',
-          children: [{ type: 'paragraph', children: [{ type: 'text', value: 'Nested quote' }] }]
-        },
-        { type: 'thematicBreak' },
-        { type: 'html', value: '<br>' }
+  test('returns an official mdast root and parses raw Markdown semantically', () => {
+    const tree: Root = toMdast({
+      blocks: [
+        { type: 'heading', depth: 2, text: 'Hello, *world*!' },
+        { type: 'paragraph', text: 'Visit [the site](https://example.com) and ~~ignore this~~.' }
       ]
     });
-  });
 
-  test('converts structured inline nodes', () => {
-    expect(
-      toMdast({
-        blocks: [
-          {
-            type: 'paragraph',
-            children: [
-              { type: 'text', value: 'A ' },
-              { type: 'emphasis', children: [{ type: 'text', value: 'little' }] },
-              { type: 'text', value: ' ' },
-              { type: 'strong', children: [{ type: 'text', value: 'bold' }] },
-              { type: 'text', value: ' ' },
-              { type: 'inlineCode', value: 'code' },
-              { type: 'text', value: ' ' },
-              {
-                type: 'link',
-                url: 'https://example.com',
-                title: 'Example',
-                children: [{ type: 'text', value: 'link' }]
-              },
-              { type: 'text', value: ' ' },
-              { type: 'image', url: '/logo.png', alt: 'Logo', title: 'Brand' },
-              { type: 'break' }
-            ]
-          }
-        ]
-      })
-    ).toEqual({
-      type: 'root',
-      children: [
-        {
-          type: 'paragraph',
-          children: [
-            { type: 'text', value: 'A ' },
-            { type: 'emphasis', children: [{ type: 'text', value: 'little' }] },
-            { type: 'text', value: ' ' },
-            { type: 'strong', children: [{ type: 'text', value: 'bold' }] },
-            { type: 'text', value: ' ' },
-            { type: 'inlineCode', value: 'code' },
-            { type: 'text', value: ' ' },
-            { type: 'link', url: 'https://example.com', title: 'Example', children: [{ type: 'text', value: 'link' }] },
-            { type: 'text', value: ' ' },
-            { type: 'image', url: '/logo.png', alt: 'Logo', title: 'Brand' },
-            { type: 'break' }
-          ]
-        }
-      ]
-    });
-  });
-
-  test('converts structured heading children', () => {
-    expect(
-      toMdast({
-        blocks: [
-          {
-            type: 'heading',
-            depth: 3,
-            children: [{ type: 'emphasis', children: [{ type: 'text', value: 'Heading' }] }]
-          }
-        ]
-      })
-    ).toEqual({
+    expect(tree).toMatchObject({
       type: 'root',
       children: [
         {
           type: 'heading',
-          depth: 3,
-          children: [{ type: 'emphasis', children: [{ type: 'text', value: 'Heading' }] }]
+          depth: 2,
+          children: [
+            { type: 'text', value: 'Hello, ' },
+            { type: 'emphasis', children: [{ type: 'text', value: 'world' }] },
+            { type: 'text', value: '!' }
+          ]
+        },
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'text', value: 'Visit ' },
+            { type: 'link', url: 'https://example.com', children: [{ type: 'text', value: 'the site' }] },
+            { type: 'text', value: ' and ' },
+            { type: 'delete', children: [{ type: 'text', value: 'ignore this' }] },
+            { type: 'text', value: '.' }
+          ]
         }
+      ]
+    });
+    expect(tree.position?.start).toEqual({ line: 1, column: 1, offset: 0 });
+  });
+
+  test('keeps structured text literal while preserving explicit formatting', () => {
+    const tree = toMdast({
+      blocks: [
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'text', value: '**literal** <tag> &copy; ' },
+            { type: 'strong', children: [{ type: 'text', value: 'formatted' }] }
+          ]
+        }
+      ]
+    });
+
+    expect(tree.children[0]).toMatchObject({
+      type: 'paragraph',
+      children: [
+        { type: 'text', value: '**literal** <tag> &copy; ' },
+        { type: 'strong', children: [{ type: 'text', value: 'formatted' }] }
       ]
     });
   });
 
-  test('converts lists, code, and table cells', () => {
-    expect(
-      toMdast({
-        blocks: [
-          {
-            type: 'list',
-            ordered: true,
-            start: 3,
-            items: [
-              { blocks: [{ type: 'paragraph', text: 'First' }] },
-              { blocks: [{ type: 'code', lang: 'ts', value: 'console.log("hello")' }] }
-            ]
-          },
-          {
-            type: 'table',
-            columns: [
-              { key: 'name', label: 'Name' },
-              { key: 'value', label: 'Value' }
-            ],
-            rows: [
-              { name: 'Missing', value: null },
-              { name: 'Object', value: { nested: true } }
-            ]
-          }
-        ]
-      })
-    ).toEqual({
-      type: 'root',
-      children: [
+  test('includes YAML frontmatter and respects render options', () => {
+    const document = {
+      frontmatter: { title: 'Example', draft: false },
+      blocks: [{ type: 'heading' as const, depth: 1 as const, text: 'Document' }]
+    };
+
+    expect(toMdast(document).children).toMatchObject([
+      { type: 'yaml', value: 'title: Example\ndraft: false' },
+      { type: 'heading', depth: 1 }
+    ]);
+    expect(toMdast(document, { frontmatter: false }).children).toMatchObject([{ type: 'heading', depth: 1 }]);
+  });
+
+  test('produces standard GFM tables and task-list fields', () => {
+    const tree = toMdast({
+      blocks: [
         {
           type: 'list',
-          ordered: true,
-          start: 3,
-          children: [
-            { type: 'listItem', children: [{ type: 'paragraph', children: [{ type: 'text', value: 'First' }] }] },
-            { type: 'listItem', children: [{ type: 'code', lang: 'ts', value: 'console.log("hello")' }] }
+          ordered: false,
+          items: [
+            { blocks: [{ type: 'paragraph', text: '[x] Complete' }] },
+            { blocks: [{ type: 'paragraph', text: '[ ] Pending' }] }
           ]
         },
         {
           type: 'table',
-          align: [null, null],
+          columns: [
+            { key: 'name', label: 'Name' },
+            { key: 'value', label: 'Value' }
+          ],
+          rows: [{ name: 'Object', value: { nested: true } }]
+        },
+        { type: 'code', lang: 'ts', value: 'console.log("hello")' },
+        { type: 'html', value: '<details>Raw HTML</details>' }
+      ]
+    });
+
+    expect(tree.children[0]).toMatchObject({
+      type: 'list',
+      ordered: false,
+      children: [
+        { type: 'listItem', checked: true },
+        { type: 'listItem', checked: false }
+      ]
+    });
+    expect(tree.children[1]).toMatchObject({
+      type: 'table',
+      align: [null, null],
+      children: [
+        {
+          type: 'tableRow',
           children: [
-            {
-              type: 'tableRow',
-              children: [
-                { type: 'tableCell', children: [{ type: 'text', value: 'Name' }] },
-                { type: 'tableCell', children: [{ type: 'text', value: 'Value' }] }
-              ]
-            },
-            {
-              type: 'tableRow',
-              children: [
-                { type: 'tableCell', children: [{ type: 'text', value: 'Missing' }] },
-                { type: 'tableCell', children: [{ type: 'text', value: '' }] }
-              ]
-            },
-            {
-              type: 'tableRow',
-              children: [
-                { type: 'tableCell', children: [{ type: 'text', value: 'Object' }] },
-                { type: 'tableCell', children: [{ type: 'text', value: '{"nested":true}' }] }
-              ]
-            }
+            { type: 'tableCell', children: [{ type: 'text', value: 'Name' }] },
+            { type: 'tableCell', children: [{ type: 'text', value: 'Value' }] }
+          ]
+        },
+        {
+          type: 'tableRow',
+          children: [
+            { type: 'tableCell', children: [{ type: 'text', value: 'Object' }] },
+            { type: 'tableCell', children: [{ type: 'text', value: '{"nested":true}' }] }
           ]
         }
       ]
     });
+    expect(tree.children[2]).toMatchObject({
+      type: 'code',
+      lang: 'ts',
+      value: 'console.log("hello")'
+    });
+    expect(tree.children[3]).toMatchObject({ type: 'html', value: '<details>Raw HTML</details>' });
+  });
+
+  test('accepts YAML source and matches parsing the rendered Markdown', () => {
+    const source = `
+frontmatter:
+  title: Equivalence
+blocks:
+  - h1: Hello *world*
+  - p: Visit https://example.com
+`;
+    const options = { bullet: '+' as const, codeFence: '~' as const };
+    const markdown = renderMarkdown(source, options);
+    const expected = fromMarkdown(markdown, {
+      extensions: [gfm(), frontmatter()],
+      mdastExtensions: [gfmFromMarkdown(), frontmatterFromMarkdown()]
+    });
+
+    expect(toMdast(source, options)).toEqual(expected);
+    expect(toMdast(source, options).position?.end.offset).toBe(markdown.length);
   });
 });

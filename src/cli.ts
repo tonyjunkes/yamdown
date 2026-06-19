@@ -28,6 +28,7 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
   const program = new Command();
   let inputPath: string | undefined;
   let inputSource: string | undefined;
+  let outputPath: string | undefined;
 
   program
     .name('yamdown')
@@ -57,6 +58,7 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
 
       const markdown = renderMarkdown(yaml);
       if (options.output !== undefined) {
+        outputPath = options.output;
         await writeFile(options.output, markdown, 'utf8');
         return;
       }
@@ -78,6 +80,11 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
     }
 
     if (isNodeError(error) && error.code === 'ENOENT') {
+      if (outputPath !== undefined && error.path === outputPath) {
+        io.stderr.write(`Output directory not found for: ${outputPath}\n`);
+        return 1;
+      }
+
       io.stderr.write(`File not found: ${error.path}\n`);
       return 1;
     }

@@ -1,6 +1,6 @@
 {
   "name": "yamdown",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Convert structured YAML documents into deterministic Markdown.",
   "keywords": [
@@ -8,6 +8,9 @@
     "documentation",
     "generator",
     "markdown",
+    "mdast",
+    "remark",
+    "unified",
     "yaml"
   ],
   "homepage": "https://github.com/tonyjunkes/yamdown#readme",
@@ -25,6 +28,7 @@
   "files": [
     "dist",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "type": "module",
@@ -50,7 +54,13 @@
     "check": "pnpm run typecheck && pnpm run lint && pnpm run fmt:check && pnpm run test && pnpm run build && pnpm run test:package"
   },
   "dependencies": {
+    "@types/mdast": "^4.0.4",
     "commander": "^15.0.0",
+    "mdast-util-from-markdown": "^2.0.3",
+    "mdast-util-frontmatter": "^2.0.1",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-frontmatter": "^2.0.0",
+    "micromark-extension-gfm": "^3.0.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },

@@ -7,7 +7,7 @@ export {
   type SourceRange,
   type ValidationIssue
 } from './errors.js';
-export { toMdast, type MdastBlock, type MdastInline, type MdastRoot } from './mdast.js';
+export { toMdast } from './mdast.js';
 export { normalizeDocument } from './normalize.js';
 export { parseYamlMarkdown } from './parse.js';
 export { renderBlock, renderDocument, renderInline, renderMarkdown } from './render.js';

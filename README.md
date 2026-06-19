@@ -1,4 +1,7 @@
-# yamdown
+<p align="center">
+  <img src="images/yamdown.png" alt="Yamdown" />
+</p>
+<h1 align="center">Yamdown</h1>
 
 Convert structured YAML into deterministic, human-readable Markdown.
 
@@ -41,7 +44,7 @@ Write **Markdown** with structured YAML.
 - **Useful diagnostics:** YAML validation failures include document paths,
   source ranges, and CLI code frames.
 - **Library and CLI:** parse, normalize, render, validate, or convert documents
-  to a small mdast-compatible tree.
+  to an official mdast tree for remark and unified workflows.
 
 ## Getting started
 
@@ -197,11 +200,39 @@ Key exports:
 | `renderMarkdown`              | Parse or normalize input and render complete Markdown  |
 | `renderDocument`              | Render an already validated document                   |
 | `renderBlock`, `renderInline` | Render individual document nodes                       |
-| `toMdast`                     | Convert a document to Yamdown's mdast-compatible shape |
+| `toMdast`                     | Convert YAML or a document to an official `mdast.Root` |
 | `yamlMarkdownDocumentSchema`  | Validate with the public Zod document schema           |
 
 Public node types, schemas, source-range types, and error classes are also
 exported from the package root.
+
+### mdast interoperability
+
+`toMdast` renders Yamdown with the supplied options and parses that exact
+Markdown with the official mdast parser plus GFM and YAML-frontmatter
+extensions:
+
+```ts
+import type { Root } from 'mdast';
+import { toMdast } from 'yamdown';
+
+const tree: Root = toMdast(
+  `
+frontmatter:
+  title: Example
+blocks:
+  - h1: Hello, *world*!
+  - p: Visit https://example.com
+`,
+  { frontmatter: true }
+);
+```
+
+Raw Markdown is represented semantically—`*world*` becomes an `emphasis`
+node—while escaped structured text remains literal. The returned tree includes
+standard source positions, GFM tables, task-list fields, autolinks,
+strikethrough, footnotes, and YAML nodes. Its positions refer to the generated
+Markdown, not the original YAML source.
 
 ### Render options
 
@@ -278,9 +309,8 @@ blocked by the package's `private` flag.
 ## Current limitations
 
 Yamdown does not parse Markdown back into YAML, provide full CommonMark
-compliance, sanitize HTML, support MDX or plugins, load remote files, or provide
-watch mode. The current mdast bridge uses a small local compatibility model
-rather than the official unified ecosystem types.
+compliance, sanitize HTML, support MDX or execute plugins, load remote files, or
+provide watch mode.
 
-Planned areas include official mdast interoperability, broader GFM node
-coverage, generated editor schemas, and richer CLI workflows.
+Planned areas include broader Yamdown node coverage, generated editor schemas,
+and richer CLI workflows.
