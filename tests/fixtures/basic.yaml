@@ -1,0 +1,10 @@
+frontmatter:
+  title: Example Document
+  description: Generated from YAML
+blocks:
+  - h1: Getting Started
+  - p: This document was generated from **YAML**.
+  - ul:
+      - Install the package
+      - Create a YAML file
+      - Render Markdown

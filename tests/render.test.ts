@@ -1,0 +1,166 @@
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { describe, expect, test } from 'vitest';
+import { renderInline, renderMarkdown } from '../src/index.js';
+
+const fixtureDir = join(import.meta.dirname, 'fixtures');
+
+function fixture(name: string): Promise<string> {
+  return readFile(join(fixtureDir, name), 'utf8');
+}
+
+describe('renderMarkdown', () => {
+  test('renders a basic fixture exactly', async () => {
+    expect(renderMarkdown(await fixture('basic.yaml'))).toBe(await fixture('basic.md'));
+  });
+
+  test('preserves raw inline Markdown', async () => {
+    expect(renderMarkdown(await fixture('inline-raw.yaml'))).toBe(
+      'This is **bold** and [linked](https://example.com).\n'
+    );
+  });
+
+  test('renders structured inline nodes', async () => {
+    expect(renderMarkdown(await fixture('inline-structured.yaml'))).toBe(
+      'This is **bold** and [linked](https://example.com "Example").\n'
+    );
+  });
+
+  test('escapes structured text without changing ordinary punctuation', async () => {
+    expect(renderMarkdown(await fixture('structured-safe.yaml'))).toBe(await fixture('structured-safe.md'));
+  });
+
+  test('preserves raw Markdown in paragraph and heading text fields', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          { type: 'heading', depth: 1, text: '*Raw* heading' },
+          { type: 'paragraph', text: '[Raw link](https://example.com)' }
+        ]
+      })
+    ).toBe('# *Raw* heading\n\n[Raw link](https://example.com)\n');
+  });
+
+  test('renders ordered lists and nested list item blocks', async () => {
+    expect(renderMarkdown(await fixture('lists.yaml'))).toBe(
+      [
+        '1. First',
+        '2. Second',
+        '',
+        '- First paragraph inside item',
+        '',
+        '  ```ts',
+        '  console.log("hello")',
+        '  ```',
+        ''
+      ].join('\n')
+    );
+  });
+
+  test('uses a longer code fence when content contains triple backticks', async () => {
+    expect(renderMarkdown(await fixture('code.yaml'))).toBe(
+      ['````md', '```ts', 'console.log("hello")', '```', '````', ''].join('\n')
+    );
+  });
+
+  test('uses a tilde fence when a code language contains a backtick', () => {
+    expect(
+      renderMarkdown({
+        blocks: [{ type: 'code', lang: 'template`literal', value: '# remains code' }]
+      })
+    ).toBe(['~~~template`literal', '# remains code', '~~~', ''].join('\n'));
+  });
+
+  test('rejects multiline code languages', () => {
+    expect(() =>
+      renderMarkdown({
+        blocks: [{ type: 'code', lang: 'ts\ninvalid', value: 'content' }]
+      })
+    ).toThrow(/Code language must be a single line/u);
+  });
+
+  test('escapes pipes in table cells', async () => {
+    expect(renderMarkdown(await fixture('tables.yaml'))).toBe(
+      [
+        '| Name | Description |',
+        '| --- | --- |',
+        '| YAML | Source \\| format |',
+        '| Markdown | Output format |',
+        ''
+      ].join('\n')
+    );
+  });
+
+  test('renders table cells with deterministic scalar and structured values', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'table',
+            columns: [
+              { key: 'empty', label: 'Empty' },
+              { key: 'scalar', label: 'Scalar' },
+              { key: 'structured', label: 'Structured' }
+            ],
+            rows: [
+              { empty: null, scalar: true, structured: { count: 2 } },
+              { scalar: 4, structured: ['a', 'b'] }
+            ]
+          }
+        ]
+      })
+    ).toBe(
+      [
+        '| Empty | Scalar | Structured |',
+        '| --- | --- | --- |',
+        '|  | true | {"count":2} |',
+        '|  | 4 | ["a","b"] |',
+        ''
+      ].join('\n')
+    );
+  });
+
+  test('renders blockquotes, thematic breaks, html, and options', () => {
+    const markdown = renderMarkdown(
+      {
+        blocks: [
+          { type: 'blockquote', blocks: [{ type: 'paragraph', text: 'Quoted.' }] },
+          { type: 'thematicBreak' },
+          { type: 'html', value: '<br>' }
+        ]
+      },
+      { blankLines: 2 }
+    );
+
+    expect(markdown).toBe(['> Quoted.', '', '', '---', '', '', '<br>', ''].join('\n'));
+  });
+});
+
+describe('renderInline', () => {
+  test('renders common structured inline nodes', () => {
+    expect(renderInline({ type: 'emphasis', children: [{ type: 'text', value: 'soft' }] })).toBe('*soft*');
+    expect(renderInline({ type: 'inlineCode', value: 'a`b' })).toBe('``a`b``');
+    expect(renderInline({ type: 'inlineCode', value: ' edge ' })).toBe('`  edge  `');
+    expect(renderInline({ type: 'image', url: '/logo.png', alt: 'A [logo]' })).toBe('![A \\[logo\\]](/logo.png)');
+    expect(renderInline({ type: 'break' })).toBe('  \n');
+  });
+
+  test('protects link destinations, titles, labels, and image alt text', () => {
+    expect(
+      renderInline({
+        type: 'link',
+        url: 'https://example.com/a b>c',
+        title: 'say "hi" \\ now',
+        children: [{ type: 'text', value: '[literal]' }]
+      })
+    ).toBe('[\\[literal\\]](<https://example.com/a%20b%3Ec> "say \\"hi\\" \\\\ now")');
+
+    expect(renderInline({ type: 'image', url: '/a(b).png', alt: 'A \\ [logo]\nnext' })).toBe(
+      '![A \\\\ \\[logo\\] next](/a\\(b\\).png)'
+    );
+  });
+
+  test('protects multiline structured text from block Markdown syntax', () => {
+    expect(renderInline({ type: 'text', value: 'Title\n===\n    indented' })).toBe('Title\n\\===\n&#32;   indented');
+  });
+});

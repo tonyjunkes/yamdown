@@ -1,0 +1,71 @@
+{
+  "name": "yamdown",
+  "version": "0.2.0",
+  "private": true,
+  "description": "Convert structured YAML documents into deterministic Markdown.",
+  "keywords": [
+    "converter",
+    "documentation",
+    "generator",
+    "markdown",
+    "yaml"
+  ],
+  "homepage": "https://github.com/tonyjunkes/yamdown#readme",
+  "bugs": {
+    "url": "https://github.com/tonyjunkes/yamdown/issues"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tonyjunkes/yamdown.git"
+  },
+  "bin": {
+    "yamdown": "./dist/cli.mjs"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "tsdown",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "lint:github": "oxlint --format=github",
+    "pack:check": "pnpm pack --dry-run",
+    "test:package": "node scripts/smoke-package.mjs",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run fmt:check && pnpm run test && pnpm run build && pnpm run test:package"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@vitest/coverage-v8": "4.1.9",
+    "oxfmt": "^0.55.0",
+    "oxlint": "^1.70.0",
+    "oxlint-tsgolint": "^0.23.0",
+    "tsdown": "^0.22.3",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "packageManager": "pnpm@11.7.0+sha512.19cc852c120c7125760f2443ee6be0ca5b40f9f50598de1a09a1f177503e010e57c23c77646e01e761de59bf874fb22a3398c33ab9691fc13eb946b6f0f4d620"
+}

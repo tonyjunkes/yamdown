@@ -1,0 +1,113 @@
+name: CI
+
+env:
+  NODE_VERSION: 24
+
+# Run on pushes to the default branch and on pull requests targeting it.
+# Also allow manual dispatches for ad-hoc runs.
+on:
+  push:
+    branches: [main]
+    paths-ignore: &ignored_paths
+      - "**/*.md"
+      - "docs/**"
+      - "LICENSE"
+  pull_request:
+    branches: [main]
+    paths-ignore: *ignored_paths
+  workflow_dispatch:
+
+# Least-privilege: the workflow only needs to read repository contents.
+permissions:
+  contents: read
+
+# Cancel in-progress runs on the same ref when a new commit lands.
+# Keeps PR feedback fast and avoids burning CI minutes on stale runs.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      # Define the shared bootstrap steps once and reuse them below with YAML aliases.
+      - &checkout_step
+        name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - &setup_pnpm_step
+        name: Setup pnpm
+        uses: pnpm/action-setup@f40ffcd9367d9f12939873eb1018b921a783ffaa # v4
+        # Version is read automatically from the `packageManager` field in package.json.
+
+      - &setup_node_step
+        name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - &install_dependencies_step
+        name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm run fmt:check
+
+      - name: Lint (with GitHub annotations)
+        run: pnpm run lint:github
+
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - *checkout_step
+      - *setup_pnpm_step
+      - *setup_node_step
+      - *install_dependencies_step
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - *checkout_step
+      - *setup_pnpm_step
+      - *setup_node_step
+      - *install_dependencies_step
+
+      - name: Run tests with coverage
+        run: pnpm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: warn
+          retention-days: 14
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - *checkout_step
+      - *setup_pnpm_step
+      - *setup_node_step
+      - *install_dependencies_step
+
+      - name: Build package
+        run: pnpm run build
+
+      - name: Upload build output
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14

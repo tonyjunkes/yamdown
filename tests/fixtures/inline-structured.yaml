@@ -1,0 +1,19 @@
+blocks:
+  - type: paragraph
+    children:
+      - type: text
+        value: 'This is '
+      - type: strong
+        children:
+          - type: text
+            value: bold
+      - type: text
+        value: ' and '
+      - type: link
+        url: https://example.com
+        title: Example
+        children:
+          - type: text
+            value: linked
+      - type: text
+        value: '.'

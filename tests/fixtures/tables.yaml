@@ -1,0 +1,12 @@
+blocks:
+  - type: table
+    columns:
+      - key: name
+        label: Name
+      - key: description
+        label: Description
+    rows:
+      - name: YAML
+        description: Source | format
+      - name: Markdown
+        description: Output format

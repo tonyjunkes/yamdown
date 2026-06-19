@@ -1,0 +1,7 @@
+blocks:
+  - code:
+      lang: md
+      value: |
+        ```ts
+        console.log("hello")
+        ```

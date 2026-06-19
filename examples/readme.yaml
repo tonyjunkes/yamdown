@@ -1,0 +1,9 @@
+frontmatter:
+  title: Yamdown Example
+blocks:
+  - h1: Yamdown Example
+  - p: Generate stable Markdown from structured YAML.
+  - ul:
+      - Validate documents with Zod
+      - Normalize shorthand blocks
+      - Render deterministic Markdown

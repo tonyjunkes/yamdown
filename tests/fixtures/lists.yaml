@@ -1,0 +1,13 @@
+blocks:
+  - ol:
+      - First
+      - Second
+  - type: list
+    ordered: false
+    items:
+      - blocks:
+          - p: First paragraph inside item
+          - code:
+              lang: ts
+              value: |
+                console.log("hello")

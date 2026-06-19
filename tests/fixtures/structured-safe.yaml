@@ -1,0 +1,15 @@
+blocks:
+  - type: heading
+    depth: 1
+    children:
+      - type: text
+        value: '*literal* & <tag>'
+  - type: paragraph
+    children:
+      - type: text
+        value: |-
+          # heading
+          - item
+          1. ordered
+          ---
+          **bold** &copy; <tag> [link]
