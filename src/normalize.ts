@@ -1,5 +1,5 @@
 import { validationErrorFromZodIssues } from './errors.js';
-import { yamlMarkdownDocumentSchema } from './schema.js';
+import { sourceDocumentSchema, yamlMarkdownDocumentSchema } from './schema.js';
 import type { BlockNode, InlineNode, ListItemNode, YamlMarkdownDocument } from './types.js';
 import type { SourceRange } from './errors.js';
 
@@ -20,8 +20,13 @@ export function normalizeDocumentWithSourceLocations(
   input: unknown,
   locate?: (path: DocumentPath) => SourceRange | undefined
 ): YamlMarkdownDocument {
+  const sourceResult = sourceDocumentSchema.safeParse(input);
+  if (!sourceResult.success) {
+    throw validationErrorFromZodIssues(sourceResult.error.issues, locate);
+  }
+
   const context: NormalizationContext = { origins: new Map() };
-  const normalized = normalizeDocumentShape(input, context);
+  const normalized = normalizeDocumentShape(sourceResult.data, context);
   const result = yamlMarkdownDocumentSchema.safeParse(normalized);
 
   if (!result.success) {
@@ -84,6 +89,19 @@ function normalizeBlock(
     return {
       type: 'paragraph',
       text: input.p
+    };
+  }
+
+  if (Object.hasOwn(input, 'markdown')) {
+    if (!hasOnlyKey(input, 'markdown')) {
+      return input;
+    }
+
+    recordOrigin(context, [...normalizedPath, 'type'], [...sourcePath, 'markdown']);
+    recordOrigin(context, [...normalizedPath, 'value'], [...sourcePath, 'markdown']);
+    return {
+      type: 'markdown',
+      value: input.markdown
     };
   }
 
@@ -158,6 +176,22 @@ function normalizeBlock(
       type: 'html',
       value: input.html
     };
+  }
+
+  if (Object.hasOwn(input, 'table')) {
+    if (!hasOnlyKey(input, 'table')) {
+      return input;
+    }
+
+    recordOrigin(context, [...normalizedPath, 'type'], [...sourcePath, 'table']);
+    recordOrigin(context, [...normalizedPath, 'columns'], [...sourcePath, 'table', 'columns']);
+    recordOrigin(context, [...normalizedPath, 'rows'], [...sourcePath, 'table', 'rows']);
+    return isRecord(input.table)
+      ? {
+          type: 'table',
+          ...input.table
+        }
+      : input;
   }
 
   if (typeof input.type !== 'string') {

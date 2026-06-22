@@ -4,8 +4,11 @@ title: Yamdown Example
 
 # Yamdown Example
 
-Generate stable Markdown from structured YAML.
+Structured YAML in. **Clean Markdown out.**
 
-- Validate documents with Zod
-- Normalize shorthand blocks
-- Render deterministic Markdown
+- Validate predictable document shapes
+- Update structured content safely
+
+## Existing content
+
+Raw blocks preserve **normal Markdown** without parsing it.

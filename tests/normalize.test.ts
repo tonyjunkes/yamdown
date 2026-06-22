@@ -8,6 +8,13 @@ describe('normalizeDocument', () => {
         blocks: [
           { h1: 'Title' },
           { p: 'Body' },
+          { markdown: '**Raw block**' },
+          {
+            table: {
+              columns: [{ key: 'name', label: 'Name' }],
+              rows: [{ name: 'YAML' }]
+            }
+          },
           { ul: ['One', { blocks: [{ quote: [{ p: 'Nested quote' }] }] }] },
           { hr: true },
           { html: '<br>' }
@@ -17,6 +24,12 @@ describe('normalizeDocument', () => {
       blocks: [
         { type: 'heading', depth: 1, text: 'Title' },
         { type: 'paragraph', text: 'Body' },
+        { type: 'markdown', value: '**Raw block**' },
+        {
+          type: 'table',
+          columns: [{ key: 'name', label: 'Name' }],
+          rows: [{ name: 'YAML' }]
+        },
         {
           type: 'list',
           ordered: false,
@@ -117,17 +130,27 @@ describe('normalizeDocument', () => {
   test.each([
     ['heading', { h1: 'Title', typo: true }],
     ['paragraph', { p: 'Body', typo: true }],
+    ['Markdown', { markdown: '**Body**', typo: true }],
     ['unordered list', { ul: [], typo: true }],
     ['ordered list', { ol: [], typo: true }],
     ['code', { code: 'value', typo: true }],
     ['blockquote', { quote: [], typo: true }],
     ['thematic break', { hr: true, typo: true }],
-    ['HTML', { html: '<br>', typo: true }]
+    ['HTML', { html: '<br>', typo: true }],
+    ['table', { table: { columns: [], rows: [] }, typo: true }]
   ])('rejects extra keys on %s shorthand blocks', (_label, block) => {
     expect(() => normalizeDocument({ blocks: [block] })).toThrow(YamlMarkdownValidationError);
   });
 
   test('rejects conflicting shorthand keys', () => {
     expect(() => normalizeDocument({ blocks: [{ h1: 'Title', p: 'Body' }] })).toThrow(YamlMarkdownValidationError);
+  });
+
+  test('keeps structured inline nodes explicit', () => {
+    expect(() =>
+      normalizeDocument({
+        blocks: [{ type: 'paragraph', children: [{ text: 'Not canonical' }] }]
+      })
+    ).toThrow(YamlMarkdownValidationError);
   });
 });

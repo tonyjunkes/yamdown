@@ -1,0 +1,18 @@
+blocks:
+  - h1: Project
+  - p: This intro uses **raw inline Markdown**.
+  - table:
+      columns:
+        - key: name
+          label: Name
+        - key: purpose
+          label: Purpose
+      rows:
+        - name: YAML
+          purpose: Structured source
+        - name: Markdown
+          purpose: Render target
+  - markdown: |
+      ## Existing Markdown Section
+
+      This section is preserved.

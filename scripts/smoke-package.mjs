@@ -44,6 +44,8 @@ try {
         "import { renderMarkdown, toMdast } from 'yamdown';",
         "const rendered = renderMarkdown({ blocks: [{ type: 'paragraph', children: [{ type: 'text', value: '**literal**' }] }] });",
         "if (rendered !== '\\\\*\\\\*literal\\\\*\\\\*\\n') throw new Error(`Unexpected library output: ${JSON.stringify(rendered)}`);",
+        "const raw = renderMarkdown('blocks:\\n  - markdown: |\\n      **raw block**\\n');",
+        "if (raw !== '**raw block**\\n') throw new Error(`Unexpected raw Markdown output: ${JSON.stringify(raw)}`);",
         "const tree = toMdast({ blocks: [{ type: 'paragraph', text: '**semantic**' }] });",
         "if (tree.children[0]?.type !== 'paragraph' || tree.children[0].children[0]?.type !== 'strong') throw new Error('Official mdast conversion failed');"
       ].join('\n')

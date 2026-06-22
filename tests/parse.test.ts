@@ -61,7 +61,7 @@ blocks:
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const validationError = caught as YamlMarkdownValidationError;
     expect(validationError.issues[0]).toMatchObject({
-      path: ['blocks', 0, 'text'],
+      path: ['blocks', 0, 'h2'],
       location: {
         start: { line: 2, column: 9, offset: 17 },
         end: { line: 2, column: 11, offset: 19 }
@@ -81,7 +81,7 @@ blocks:
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion
     const validationError = caught as YamlMarkdownValidationError;
     expect(validationError.issues[0]).toMatchObject({
-      path: ['blocks', 0, 'value'],
+      path: ['blocks', 0, 'html'],
       location: { start: { line: 2, column: 11 } }
     });
   });
@@ -116,5 +116,39 @@ blocks:
     const validationError = caught as YamlMarkdownValidationError;
     expect(validationError.issues[0]?.path).toEqual(['blocks', 0, 'text']);
     expect(validationError.issues[0]?.location?.start.line).toBe(2);
+  });
+
+  test('reports malformed Markdown shorthand at its source value', () => {
+    let caught: unknown;
+    try {
+      parseYamlMarkdown('blocks:\n  - markdown:\n      nested: invalid\n');
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const validationError = caught as YamlMarkdownValidationError;
+    expect(validationError.issues[0]).toMatchObject({
+      path: ['blocks', 0, 'markdown'],
+      location: { start: { line: 3, column: 7 } }
+    });
+  });
+
+  test('reports malformed table shorthand at its source field', () => {
+    let caught: unknown;
+    try {
+      parseYamlMarkdown('blocks:\n  - table:\n      columns: invalid\n      rows: []\n');
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
+    const validationError = caught as YamlMarkdownValidationError;
+    expect(validationError.issues[0]).toMatchObject({
+      path: ['blocks', 0, 'table', 'columns'],
+      location: { start: { line: 3, column: 16 } }
+    });
   });
 });

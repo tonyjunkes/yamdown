@@ -26,6 +26,7 @@ export type {
   LinkInline,
   ListItemNode,
   ListNode,
+  MarkdownNode,
   ParagraphNode,
   RenderOptions,
   StrongInline,

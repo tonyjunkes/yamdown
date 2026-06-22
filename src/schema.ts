@@ -69,6 +69,13 @@ const paragraphSchema: z.ZodType<ParagraphNode> = z.union([
     .strict()
 ]);
 
+const markdownSchema = z
+  .object({
+    type: z.literal('markdown'),
+    value: z.string()
+  })
+  .strict();
+
 const headingSchema = z.union([
   z
     .object({
@@ -98,6 +105,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
   z.union([
     headingSchema,
     paragraphSchema,
+    markdownSchema,
     z
       .object({
         type: z.literal('list'),
@@ -154,5 +162,109 @@ export const yamlMarkdownDocumentSchema: z.ZodType<YamlMarkdownDocument> = z
   .object({
     frontmatter: frontmatterSchema.optional(),
     blocks: z.array(blockNodeSchema)
+  })
+  .strict();
+
+const tableBodySchema = z
+  .object({
+    columns: z.array(
+      z
+        .object({
+          key: z.string(),
+          label: z.string()
+        })
+        .strict()
+    ),
+    rows: z.array(z.record(z.string(), z.unknown()))
+  })
+  .strict();
+
+const sourceListItemSchema: z.ZodType = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.array(sourceBlockNodeSchema),
+    z
+      .object({
+        blocks: z.array(sourceBlockNodeSchema)
+      })
+      .strict()
+  ])
+);
+
+const sourceBlockNodeSchema: z.ZodType = z.lazy(() =>
+  z.union([
+    headingSchema,
+    paragraphSchema,
+    markdownSchema,
+    z
+      .object({
+        type: z.literal('list'),
+        ordered: z.boolean(),
+        start: z.number().int().positive().optional(),
+        items: z.array(sourceListItemSchema)
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal('code'),
+        lang: z
+          .string()
+          .regex(/^[^\r\n]*$/u, 'Code language must be a single line')
+          .optional(),
+        value: z.string()
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal('blockquote'),
+        blocks: z.array(sourceBlockNodeSchema)
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal('thematicBreak')
+      })
+      .strict(),
+    tableBodySchema.extend({ type: z.literal('table') }).strict(),
+    z
+      .object({
+        type: z.literal('html'),
+        value: z.string()
+      })
+      .strict(),
+    ...shorthandHeadings.map((key) => z.object({ [key]: z.string() }).strict()),
+    z.object({ p: z.string() }).strict(),
+    z.object({ markdown: z.string() }).strict(),
+    z.object({ ul: z.array(sourceListItemSchema) }).strict(),
+    z.object({ ol: z.array(sourceListItemSchema) }).strict(),
+    z
+      .object({
+        code: z.union([
+          z.string(),
+          z
+            .object({
+              lang: z
+                .string()
+                .regex(/^[^\r\n]*$/u, 'Code language must be a single line')
+                .optional(),
+              value: z.string()
+            })
+            .strict()
+        ])
+      })
+      .strict(),
+    z.object({ quote: z.array(sourceBlockNodeSchema) }).strict(),
+    z.object({ hr: z.literal(true) }).strict(),
+    z.object({ table: tableBodySchema }).strict(),
+    z.object({ html: z.string() }).strict()
+  ])
+);
+
+const shorthandHeadings = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const;
+
+export const sourceDocumentSchema: z.ZodType = z
+  .object({
+    frontmatter: frontmatterSchema.optional(),
+    blocks: z.array(sourceBlockNodeSchema)
   })
   .strict();

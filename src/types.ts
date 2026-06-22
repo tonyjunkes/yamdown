@@ -6,6 +6,7 @@ export interface YamlMarkdownDocument {
 export type BlockNode =
   | HeadingNode
   | ParagraphNode
+  | MarkdownNode
   | ListNode
   | CodeNode
   | BlockquoteNode
@@ -34,6 +35,11 @@ export type ParagraphNode =
       readonly type: 'paragraph';
       readonly children: readonly InlineNode[];
     };
+
+export interface MarkdownNode {
+  readonly type: 'markdown';
+  readonly value: string;
+}
 
 export interface ListNode {
   readonly type: 'list';

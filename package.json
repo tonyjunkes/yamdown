@@ -1,8 +1,8 @@
 {
   "name": "yamdown",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
-  "description": "Convert structured YAML documents into deterministic Markdown.",
+  "description": "Structured YAML authoring for deterministic Markdown output.",
   "keywords": [
     "converter",
     "documentation",
@@ -10,6 +10,7 @@
     "markdown",
     "mdast",
     "remark",
+    "structured-authoring",
     "unified",
     "yaml"
   ],
@@ -65,13 +66,14 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^25.9.3",
+    "@types/node": "^26.0.0",
+    "@typescript/native-preview": "npm:typescript@7.0.1-rc",
     "@vitest/coverage-v8": "4.1.9",
     "oxfmt": "^0.55.0",
     "oxlint": "^1.70.0",
     "oxlint-tsgolint": "^0.23.0",
     "tsdown": "^0.22.3",
-    "typescript": "^6.0.3",
+    "typescript": "npm:@typescript/typescript6@^6.0.1",
     "vitest": "^4.1.9"
   },
   "engines": {

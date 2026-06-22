@@ -2,8 +2,11 @@ frontmatter:
   title: Yamdown Example
 blocks:
   - h1: Yamdown Example
-  - p: Generate stable Markdown from structured YAML.
+  - p: Structured YAML in. **Clean Markdown out.**
   - ul:
-      - Validate documents with Zod
-      - Normalize shorthand blocks
-      - Render deterministic Markdown
+      - Validate predictable document shapes
+      - Update structured content safely
+  - markdown: |
+      ## Existing content
+
+      Raw blocks preserve **normal Markdown** without parsing it.

@@ -41,10 +41,7 @@ export function renderDocument(document: YamlMarkdownDocument, options: RenderOp
   parts.push(...document.blocks.map((block) => renderBlock(block, renderOptions)));
 
   const separator = '\n'.repeat(Math.max(1, renderOptions.blankLines) + 1);
-  return `${parts
-    .filter((part) => part.length > 0)
-    .join(separator)
-    .trimEnd()}\n`;
+  return `${trimTrailingLineEndings(parts.filter((part) => part.length > 0).join(separator))}\n`;
 }
 
 export function renderBlock(block: BlockNode, options: Required<RenderOptions> = defaultOptions): string {
@@ -53,6 +50,8 @@ export function renderBlock(block: BlockNode, options: Required<RenderOptions> =
       return `${'#'.repeat(block.depth)} ${'text' in block ? block.text : renderInlineChildren(block.children, false)}`;
     case 'paragraph':
       return renderParagraph(block);
+    case 'markdown':
+      return renderRawMarkdown(block.value);
     case 'list':
       return renderList(block, options);
     case 'code':
@@ -99,6 +98,15 @@ function renderParagraph(node: ParagraphNode): string {
   return 'text' in node ? node.text : renderInlineChildren(node.children);
 }
 
+function renderRawMarkdown(value: string): string {
+  const normalized = value.replaceAll(/\r\n?/gu, '\n');
+  if (/^[\t ]*$/u.test(normalized)) {
+    return '';
+  }
+
+  return normalized.replace(/^(?:[\t ]*\n)+/u, '').replace(/(?:\n[\t ]*)+$/u, '');
+}
+
 function renderInlineChildren(children: readonly InlineNode[], initialAtLineStart = true): string {
   let atLineStart = initialAtLineStart;
   let output = '';
@@ -118,7 +126,7 @@ function renderList(node: ListNode, options: Required<RenderOptions>): string {
   return node.items
     .map((item, index) => {
       const marker = node.ordered ? `${start + index}${options.orderedDelimiter}` : options.bullet;
-      const body = renderBlocks(item.blocks, options).trimEnd();
+      const body = trimTrailingLineEndings(renderBlocks(item.blocks, options));
       const lines = body.length > 0 ? body.split('\n') : [''];
       const continuation = ' '.repeat(marker.length + 1);
       const renderedLines = [`${marker} ${lines[0] ?? ''}`];
@@ -143,8 +151,7 @@ function renderCode(node: CodeNode, options: Required<RenderOptions>): string {
 }
 
 function renderBlockquote(node: BlockquoteNode, options: Required<RenderOptions>): string {
-  return renderBlocks(node.blocks, options)
-    .trimEnd()
+  return trimTrailingLineEndings(renderBlocks(node.blocks, options))
     .split('\n')
     .map((line) => (line.length > 0 ? `> ${line}` : '>'))
     .join('\n');
@@ -280,6 +287,10 @@ function renderCellValue(value: unknown): string {
 
 function escapeRegExp(value: string): string {
   return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+}
+
+function trimTrailingLineEndings(value: string): string {
+  return value.replace(/\n+$/u, '');
 }
 
 function unreachable(_value: never): never {

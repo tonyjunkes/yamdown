@@ -1,0 +1,12 @@
+# Project
+
+This intro uses **raw inline Markdown**.
+
+| Name | Purpose |
+| --- | --- |
+| YAML | Structured source |
+| Markdown | Render target |
+
+## Existing Markdown Section
+
+This section is preserved.

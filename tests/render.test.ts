@@ -20,6 +20,40 @@ describe('renderMarkdown', () => {
     );
   });
 
+  test('renders a raw Markdown block fixture exactly', async () => {
+    expect(renderMarkdown(await fixture('raw-markdown.yaml'))).toBe(await fixture('raw-markdown.md'));
+  });
+
+  test('mixes structured and raw blocks with table shorthand', async () => {
+    expect(renderMarkdown(await fixture('mixed.yaml'))).toBe(await fixture('mixed.txt'));
+  });
+
+  test('normalizes raw Markdown boundaries without changing significant whitespace', () => {
+    expect(
+      renderMarkdown({
+        blocks: [{ type: 'markdown', value: '\r\n  indented  \r\n\r\nNext  \r\n\t\r\n' }]
+      })
+    ).toBe('  indented  \n\nNext  \n');
+  });
+
+  test('supports raw Markdown recursively in lists and blockquotes', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'list',
+            ordered: false,
+            items: [{ blocks: [{ type: 'markdown', value: '**List item**  ' }] }]
+          },
+          {
+            type: 'blockquote',
+            blocks: [{ type: 'markdown', value: '- quoted\n- Markdown' }]
+          }
+        ]
+      })
+    ).toBe('- **List item**  \n\n> - quoted\n> - Markdown\n');
+  });
+
   test('renders structured inline nodes', async () => {
     expect(renderMarkdown(await fixture('inline-structured.yaml'))).toBe(
       'This is **bold** and [linked](https://example.com "Example").\n'

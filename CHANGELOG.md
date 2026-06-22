@@ -3,6 +3,22 @@
 All notable changes to Yamdown are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.4.0 - 2026-06-21
+
+### Added
+
+- Canonical and shorthand raw Markdown blocks for gradual structured-authoring
+  adoption.
+- Table shorthand and strict source-shape validation before canonical
+  normalization.
+- Mixed raw and structured examples across the README and shipped example.
+
+### Changed
+
+- Project and CLI language now position Yamdown as a structured authoring
+  format for Markdown output.
+- Validation errors for malformed shorthand report paths in the source shape.
+
 ## 0.3.0 - 2026-06-19
 
 ### Added

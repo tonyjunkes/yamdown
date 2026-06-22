@@ -32,7 +32,7 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
 
   program
     .name('yamdown')
-    .description('Convert structured YAML into deterministic Markdown.')
+    .description('Author deterministic Markdown with structured YAML.')
     .argument('<input>', 'YAML input file')
     .option('-o, --output <file>', 'write Markdown to a file')
     .option('--check', 'validate input without rendering Markdown')

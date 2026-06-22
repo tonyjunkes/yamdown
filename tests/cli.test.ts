@@ -37,6 +37,18 @@ describe('runCli', () => {
     expect(stderr.value).toBe('');
   });
 
+  test('renders and checks raw Markdown blocks', async () => {
+    const input = join(dir, 'input.yaml');
+    await writeFile(input, 'blocks:\n  - markdown: |\n      **CLI Markdown**\n', 'utf8');
+    const stdout = new MemoryStream();
+    const stderr = new MemoryStream();
+
+    await expect(runCli(['node', 'yamdown', '--check', input], { stderr, stdout })).resolves.toBe(0);
+    await expect(runCli(['node', 'yamdown', input], { stderr, stdout })).resolves.toBe(0);
+    expect(stdout.value).toBe('**CLI Markdown**\n');
+    expect(stderr.value).toBe('');
+  });
+
   test('writes Markdown to an output file', async () => {
     const input = join(dir, 'input.yaml');
     const output = join(dir, 'output.md');
@@ -118,6 +130,7 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(0);
     expect(stdout.value).toContain('Usage: yamdown [options] <input>');
+    expect(stdout.value).toContain('Author deterministic Markdown with structured YAML.');
     expect(stderr.value).toBe('');
   });
 

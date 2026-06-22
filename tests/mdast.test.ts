@@ -43,6 +43,23 @@ describe('toMdast', () => {
     expect(tree.position?.start).toEqual({ line: 1, column: 1, offset: 0 });
   });
 
+  test('parses raw Markdown blocks semantically', () => {
+    expect(
+      toMdast({
+        blocks: [{ type: 'markdown', value: '## Existing section\n\n- **One**\n- Two' }]
+      }).children
+    ).toMatchObject([
+      { type: 'heading', depth: 2, children: [{ type: 'text', value: 'Existing section' }] },
+      {
+        type: 'list',
+        children: [
+          { children: [{ children: [{ type: 'strong', children: [{ type: 'text', value: 'One' }] }] }] },
+          { children: [{ children: [{ type: 'text', value: 'Two' }] }] }
+        ]
+      }
+    ]);
+  });
+
   test('keeps structured text literal while preserving explicit formatting', () => {
     const tree = toMdast({
       blocks: [

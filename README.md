@@ -3,21 +3,27 @@
 </p>
 <h1 align="center">Yamdown</h1>
 
-Convert structured YAML into deterministic, human-readable Markdown.
+Yamdown is a structured YAML authoring format for generating deterministic,
+human-readable Markdown.
 
-Yamdown gives tools and people a document format that is easier to validate,
-transform, and regenerate than raw Markdown while keeping the resulting files
-pleasant to read and edit.
+Markdown is excellent for humans, GitHub, documentation sites, and LLM-readable
+output. It is less reliable as source data for validation, transformation, and
+automated edits. Yamdown keeps Markdown as the output format and uses YAML as
+the structured source of truth.
+
+**Structured YAML in. Clean Markdown out.**
 
 ```yaml
 frontmatter:
   title: Example
 blocks:
   - h1: Getting Started
-  - p: Write **Markdown** with structured YAML.
-  - ul:
-      - Validate the document
-      - Render stable output
+  - p: Use structured nodes where tools need predictable data.
+  - markdown: |
+      Use **normal Markdown** where flexibility is more useful.
+
+      - Adopt Yamdown gradually
+      - Keep familiar Markdown syntax
 ```
 
 ```md
@@ -27,20 +33,24 @@ title: Example
 
 # Getting Started
 
-Write **Markdown** with structured YAML.
+Use structured nodes where tools need predictable data.
 
-- Validate the document
-- Render stable output
+Use **normal Markdown** where flexibility is more useful.
+
+- Adopt Yamdown gradually
+- Keep familiar Markdown syntax
 ```
 
 ## Why yamdown?
 
+- **Structured source of truth:** reorder sections, update table rows, and
+  validate required document shapes without reparsing Markdown.
 - **Deterministic output:** the same normalized document and options produce the
   same Markdown, including whitespace and final newlines.
 - **Strict validation:** TypeScript types and Zod schemas share one document
   model.
 - **Two authoring modes:** use raw Markdown for trusted content or structured
-  inline nodes for safely escaped generated content.
+  nodes for safer generated and automated content.
 - **Useful diagnostics:** YAML validation failures include document paths,
   source ranges, and CLI code frames.
 - **Library and CLI:** parse, normalize, render, validate, or convert documents
@@ -98,18 +108,45 @@ Most common blocks also have a compact shorthand:
 | -------------- | --------------- | ----------------- |
 | Heading        | `heading`       | `h1` through `h6` |
 | Paragraph      | `paragraph`     | `p`               |
+| Raw Markdown   | `markdown`      | `markdown`        |
 | Unordered list | `list`          | `ul`              |
 | Ordered list   | `list`          | `ol`              |
 | Fenced code    | `code`          | `code`            |
 | Blockquote     | `blockquote`    | `quote`           |
 | Thematic break | `thematicBreak` | `hr`              |
 | Raw HTML       | `html`          | `html`            |
-| Table          | `table`         | —                 |
+| Table          | `table`         | `table`           |
 
 Lists may contain strings for simple items or nested block arrays for richer
-content. Code fences automatically grow when their contents include the chosen
+content. Table shorthand wraps the same `columns` and `rows` fields as the
+verbose node. Code fences automatically grow when their contents include the chosen
 fence character. Code language identifiers must be single-line strings; when an
 identifier contains a backtick, the renderer uses a tilde fence.
+
+### Raw Markdown escape hatch
+
+Yamdown does not require every part of a document to become structured at once.
+Use a raw Markdown block for trusted existing content or syntax that does not
+have a dedicated Yamdown node:
+
+```yaml
+blocks:
+  - markdown: |
+      This is **normal Markdown**.
+
+      - It remains familiar
+      - It can be migrated gradually
+```
+
+Raw blocks can be mixed with structured blocks and nested in lists or
+blockquotes. Yamdown normalizes their outer blank lines and line endings for
+deterministic composition but does not parse, validate, escape, or sanitize the
+Markdown inside them. Internal indentation, blank lines, and significant spaces
+are preserved.
+
+Use structured nodes when a tool or LLM must reliably validate or manipulate a
+specific part of the document. Use raw blocks when preserving normal Markdown
+authoring is more valuable than field-level structure.
 
 ### Raw and structured inline content
 
@@ -150,7 +187,7 @@ Supported inline nodes are `text`, `emphasis`, `strong`, `inlineCode`, `link`,
 `image`, and `break`.
 
 > [!WARNING]
-> Raw Markdown and `html` blocks are intentionally trusted and are not
+> Raw Markdown—including paragraph and heading `text`—and `html` blocks are intentionally trusted and are not
 > sanitized. Structured text prevents Markdown syntax injection, but Yamdown
 > does not validate URL schemes or sanitize rendered output; validate links and
 > HTML according to your application’s trust boundary.
@@ -276,8 +313,9 @@ yamdown --check document.yaml
 
 ## Diagnostics
 
-Validation issues retain their normalized document path. When the input comes
-from YAML, they also include one-based line and column positions plus
+Source-shape validation issues retain the original YAML path; canonical
+validation issues use the normalized document path. When the input comes from
+YAML, issues also include one-based line and column positions plus
 zero-based character offsets; range ends are exclusive.
 
 ```text
@@ -308,9 +346,9 @@ blocked by the package's `private` flag.
 
 ## Current limitations
 
-Yamdown does not parse Markdown back into YAML, provide full CommonMark
-compliance, sanitize HTML, support MDX or execute plugins, load remote files, or
-provide watch mode.
+Yamdown v1 is not a Markdown superset and does not parse Markdown back into
+YAML. It does not provide Markdown AST round-tripping, sanitize Markdown or
+HTML, support MDX or execute plugins, load remote files, or provide watch mode.
 
 Planned areas include broader Yamdown node coverage, generated editor schemas,
 and richer CLI workflows.
