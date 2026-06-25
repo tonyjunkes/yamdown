@@ -1,10 +1,28 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { stringifyYamlMarkdownJsonSchema } from '../dist/json-schema.mjs';
-
 const root = dirname(import.meta.dirname);
 const schemaPath = join(root, 'schema', 'yamdown.schema.json');
+const jsonSchemaModulePath = ['..', 'dist', 'json-schema.mjs'].join('/');
+/** @type {unknown} */
+const jsonSchemaModule = await import(jsonSchemaModulePath);
+
+if (!isJsonSchemaModule(jsonSchemaModule)) {
+  throw new TypeError('Expected the built JSON Schema module to export stringifyYamlMarkdownJsonSchema.');
+}
 
 await mkdir(dirname(schemaPath), { recursive: true });
-await writeFile(schemaPath, stringifyYamlMarkdownJsonSchema(), 'utf8');
+await writeFile(schemaPath, jsonSchemaModule.stringifyYamlMarkdownJsonSchema(), 'utf8');
+
+/**
+ * @param {unknown} value imported module namespace
+ * @returns {value is { stringifyYamlMarkdownJsonSchema: () => string }} true when the module has the expected export
+ */
+function isJsonSchemaModule(value) {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'stringifyYamlMarkdownJsonSchema' in value &&
+    typeof value.stringifyYamlMarkdownJsonSchema === 'function'
+  );
+}
