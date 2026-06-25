@@ -3,6 +3,14 @@
 All notable changes to Yamdown are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.5.0 - 2026-06-24
+
+### Added
+
+- Structured GFM authoring for strikethrough inline nodes, task-list item state,
+  table column alignment, and fenced-code metadata.
+- Package smoke coverage for the installed 0.5 structured GFM surface.
+
 ## 0.4.0 - 2026-06-21
 
 ### Added

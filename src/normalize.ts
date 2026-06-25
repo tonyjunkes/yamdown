@@ -245,6 +245,7 @@ function normalizeCodeShorthand(
   if (isRecord(input)) {
     recordOrigin(context, [...normalizedPath, 'value'], [...sourcePath, 'value']);
     recordOrigin(context, [...normalizedPath, 'lang'], [...sourcePath, 'lang']);
+    recordOrigin(context, [...normalizedPath, 'meta'], [...sourcePath, 'meta']);
     return {
       type: 'code',
       ...input

@@ -13,6 +13,12 @@ class MemoryStream {
   }
 }
 
+class ThrowingStream {
+  public write(): boolean {
+    throw new Error('stdout failed');
+  }
+}
+
 describe('runCli', () => {
   let dir: string;
 
@@ -108,6 +114,64 @@ describe('runCli', () => {
     expect(stderr.value).toContain(`${input}:2:9 error:`);
     expect(stderr.value).toContain('2 |   - h2: 42');
     expect(stderr.value).toContain('|         ^^');
+  });
+
+  test('points multiline validation ranges through the end of the source line', async () => {
+    const input = join(dir, 'input.yaml');
+    const stderr = new MemoryStream();
+    await writeFile(
+      input,
+      [
+        'blocks:',
+        '  - code:',
+        '      lang: ts',
+        '      meta: |',
+        '        title="example.ts"',
+        '        extra',
+        '      value: content',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+
+    const exitCode = await runCli(['node', 'yamdown', '--check', input], {
+      stderr,
+      stdout: new MemoryStream()
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.value).toContain(`${input}:4:13 error:`);
+    expect(stderr.value).toContain('4 |       meta: |');
+    expect(stderr.value).toContain('|             ^^');
+  });
+
+  test('omits the code frame when an error has no source location', async () => {
+    const input = join(dir, 'empty.yaml');
+    const stderr = new MemoryStream();
+    await writeFile(input, '', 'utf8');
+
+    const exitCode = await runCli(['node', 'yamdown', '--check', input], {
+      stderr,
+      stdout: new MemoryStream()
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.value).toBe('Invalid YAML Markdown document: Invalid input: expected object, received null\n');
+  });
+
+  test('prints unexpected error stacks in debug mode', async () => {
+    const input = join(dir, 'input.yaml');
+    const stderr = new MemoryStream();
+    await writeFile(input, 'blocks:\n  - p: Valid\n', 'utf8');
+
+    const exitCode = await runCli(['node', 'yamdown', '--debug', input], {
+      stderr,
+      stdout: new ThrowingStream()
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.value).toContain('Error: stdout failed');
+    expect(stderr.value).toContain('ThrowingStream.write');
   });
 
   test('returns commander errors for missing input', async () => {

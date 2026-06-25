@@ -46,6 +46,8 @@ try {
         "if (rendered !== '\\\\*\\\\*literal\\\\*\\\\*\\n') throw new Error(`Unexpected library output: ${JSON.stringify(rendered)}`);",
         "const raw = renderMarkdown('blocks:\\n  - markdown: |\\n      **raw block**\\n');",
         "if (raw !== '**raw block**\\n') throw new Error(`Unexpected raw Markdown output: ${JSON.stringify(raw)}`);",
+        "const gfm = renderMarkdown({ blocks: [{ type: 'list', ordered: false, items: [{ checked: true, blocks: [{ type: 'paragraph', text: 'Done' }] }] }, { type: 'table', columns: [{ key: 'name', label: 'Name', align: 'center' }], rows: [{ name: 'Yamdown' }] }, { type: 'code', lang: 'ts', meta: 'title=\"demo.ts\"', value: 'console.log(\"hello\")' }] });",
+        "if (!gfm.includes('- [x] Done') || !gfm.includes('| :---: |') || !gfm.includes('```ts title=\"demo.ts\"')) throw new Error(`Unexpected GFM output: ${JSON.stringify(gfm)}`);",
         "const tree = toMdast({ blocks: [{ type: 'paragraph', text: '**semantic**' }] });",
         "if (tree.children[0]?.type !== 'paragraph' || tree.children[0].children[0]?.type !== 'strong') throw new Error('Official mdast conversion failed');"
       ].join('\n')

@@ -5,6 +5,24 @@ import { YamlMarkdownParseError, YamlMarkdownValidationError, parseYamlMarkdown 
 
 const fixtureDir = join(import.meta.dirname, 'fixtures');
 
+function expectParseError(error: unknown): YamlMarkdownParseError {
+  expect(error).toBeInstanceOf(YamlMarkdownParseError);
+  if (!(error instanceof YamlMarkdownParseError)) {
+    throw new Error('Expected YamlMarkdownParseError');
+  }
+
+  return error;
+}
+
+function expectValidationError(error: unknown): YamlMarkdownValidationError {
+  expect(error).toBeInstanceOf(YamlMarkdownValidationError);
+  if (!(error instanceof YamlMarkdownValidationError)) {
+    throw new Error('Expected YamlMarkdownValidationError');
+  }
+
+  return error;
+}
+
 describe('parseYamlMarkdown', () => {
   test('parses valid YAML into a normalized document', () => {
     expect(
@@ -25,9 +43,7 @@ blocks:
       caught = error;
     }
 
-    expect(caught).toBeInstanceOf(YamlMarkdownParseError);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const parseError = caught as YamlMarkdownParseError;
+    const parseError = expectParseError(caught);
     expect(parseError.location?.start.line).toBe(1);
     expect(parseError.location?.start.column).toBeGreaterThan(0);
   });
@@ -42,9 +58,7 @@ blocks:
       caught = error;
     }
 
-    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const { issues, message } = caught as YamlMarkdownValidationError;
+    const { issues, message } = expectValidationError(caught);
     expect(issues[0]?.path).toContain('blocks');
     expect(message).toMatch(/Invalid YAML Markdown document/u);
   });
@@ -57,9 +71,7 @@ blocks:
       caught = error;
     }
 
-    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const validationError = caught as YamlMarkdownValidationError;
+    const validationError = expectValidationError(caught);
     expect(validationError.issues[0]).toMatchObject({
       path: ['blocks', 0, 'h2'],
       location: {
@@ -77,9 +89,7 @@ blocks:
       caught = error;
     }
 
-    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const validationError = caught as YamlMarkdownValidationError;
+    const validationError = expectValidationError(caught);
     expect(validationError.issues[0]).toMatchObject({
       path: ['blocks', 0, 'html'],
       location: { start: { line: 2, column: 11 } }
@@ -94,9 +104,7 @@ blocks:
       caught = error;
     }
 
-    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const validationError = caught as YamlMarkdownValidationError;
+    const validationError = expectValidationError(caught);
     expect(validationError.issues[0]).toMatchObject({
       path: ['title'],
       location: { start: { line: 1, column: 8 } }
@@ -111,9 +119,7 @@ blocks:
       caught = error;
     }
 
-    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const validationError = caught as YamlMarkdownValidationError;
+    const validationError = expectValidationError(caught);
     expect(validationError.issues[0]?.path).toEqual(['blocks', 0, 'text']);
     expect(validationError.issues[0]?.location?.start.line).toBe(2);
   });
@@ -126,9 +132,7 @@ blocks:
       caught = error;
     }
 
-    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const validationError = caught as YamlMarkdownValidationError;
+    const validationError = expectValidationError(caught);
     expect(validationError.issues[0]).toMatchObject({
       path: ['blocks', 0, 'markdown'],
       location: { start: { line: 3, column: 7 } }
@@ -143,12 +147,40 @@ blocks:
       caught = error;
     }
 
-    expect(caught).toBeInstanceOf(YamlMarkdownValidationError);
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion
-    const validationError = caught as YamlMarkdownValidationError;
+    const validationError = expectValidationError(caught);
     expect(validationError.issues[0]).toMatchObject({
       path: ['blocks', 0, 'table', 'columns'],
       location: { start: { line: 3, column: 16 } }
+    });
+  });
+
+  test('reports malformed code metadata at its source field', () => {
+    let caught: unknown;
+    try {
+      parseYamlMarkdown('blocks:\n  - code:\n      meta: title="example.ts"\n      value: content\n');
+    } catch (error) {
+      caught = error;
+    }
+
+    const validationError = expectValidationError(caught);
+    expect(validationError.issues[0]).toMatchObject({
+      path: ['blocks', 0, 'code', 'meta'],
+      location: { start: { line: 3, column: 13 } }
+    });
+  });
+
+  test('reports malformed task-list state at its source field', () => {
+    let caught: unknown;
+    try {
+      parseYamlMarkdown('blocks:\n  - ul:\n      - checked: yes\n        blocks: []\n');
+    } catch (error) {
+      caught = error;
+    }
+
+    const validationError = expectValidationError(caught);
+    expect(validationError.issues[0]).toMatchObject({
+      path: ['blocks', 0, 'ul', 0, 'checked'],
+      location: { start: { line: 3, column: 18 } }
     });
   });
 });

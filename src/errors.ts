@@ -72,7 +72,7 @@ function normalizeZodIssue(
     const branches = issue.errors.map((branch) =>
       branch.flatMap((nestedIssue) => normalizeZodIssue(nestedIssue, locate, unionPath))
     );
-    return branches.reduce((best, branch) => (branch.length < best.length ? branch : best));
+    return branches.reduce((best, branch) => (compareIssueBranches(branch, best) < 0 ? branch : best));
   }
 
   const path = [...prefix, ...normalizePath(issue.path)];
@@ -85,6 +85,18 @@ function normalizeZodIssue(
   }
 
   return [{ code: issue.code, location: locate?.(path), message: issue.message, path }];
+}
+
+function compareIssueBranches(left: readonly ValidationIssue[], right: readonly ValidationIssue[]): number {
+  if (left.length !== right.length) {
+    return left.length - right.length;
+  }
+
+  return issuePathScore(right) - issuePathScore(left);
+}
+
+function issuePathScore(issues: readonly ValidationIssue[]): number {
+  return issues.reduce((total, issue) => total + (issue.path?.length ?? 0), 0);
 }
 
 function normalizePath(path: readonly PropertyKey[]): (string | number)[] {

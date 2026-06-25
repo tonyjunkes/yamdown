@@ -11,11 +11,11 @@ describe('normalizeDocument', () => {
           { markdown: '**Raw block**' },
           {
             table: {
-              columns: [{ key: 'name', label: 'Name' }],
+              columns: [{ key: 'name', label: 'Name', align: 'left' }],
               rows: [{ name: 'YAML' }]
             }
           },
-          { ul: ['One', { blocks: [{ quote: [{ p: 'Nested quote' }] }] }] },
+          { ul: ['One', { checked: true, blocks: [{ quote: [{ p: 'Nested quote' }] }] }] },
           { hr: true },
           { html: '<br>' }
         ]
@@ -27,7 +27,7 @@ describe('normalizeDocument', () => {
         { type: 'markdown', value: '**Raw block**' },
         {
           type: 'table',
-          columns: [{ key: 'name', label: 'Name' }],
+          columns: [{ key: 'name', label: 'Name', align: 'left' }],
           rows: [{ name: 'YAML' }]
         },
         {
@@ -36,6 +36,7 @@ describe('normalizeDocument', () => {
           items: [
             { blocks: [{ type: 'paragraph', text: 'One' }] },
             {
+              checked: true,
               blocks: [
                 {
                   type: 'blockquote',
@@ -68,7 +69,7 @@ describe('normalizeDocument', () => {
       normalizeDocument({
         blocks: [
           { ol: [[{ p: 'Nested item' }]] },
-          { code: 'console.log("hello")' },
+          { code: { lang: 'ts', meta: 'title="hello.ts"', value: 'console.log("hello")' } },
           {
             type: 'paragraph',
             children: [
@@ -91,7 +92,7 @@ describe('normalizeDocument', () => {
             }
           ]
         },
-        { type: 'code', value: 'console.log("hello")' },
+        { type: 'code', lang: 'ts', meta: 'title="hello.ts"', value: 'console.log("hello")' },
         {
           type: 'paragraph',
           children: [
@@ -102,6 +103,16 @@ describe('normalizeDocument', () => {
           ]
         }
       ]
+    });
+  });
+
+  test('normalizes scalar code shorthand', () => {
+    expect(
+      normalizeDocument({
+        blocks: [{ code: 'console.log("hello")' }]
+      })
+    ).toEqual({
+      blocks: [{ type: 'code', value: 'console.log("hello")' }]
     });
   });
 
@@ -150,6 +161,44 @@ describe('normalizeDocument', () => {
     expect(() =>
       normalizeDocument({
         blocks: [{ type: 'paragraph', children: [{ text: 'Not canonical' }] }]
+      })
+    ).toThrow(YamlMarkdownValidationError);
+  });
+
+  test('rejects malformed 0.5 GFM fields', () => {
+    expect(() =>
+      normalizeDocument({
+        blocks: [
+          {
+            type: 'list',
+            ordered: false,
+            items: [{ checked: 'yes', blocks: [] }]
+          }
+        ]
+      })
+    ).toThrow(YamlMarkdownValidationError);
+
+    expect(() =>
+      normalizeDocument({
+        blocks: [
+          {
+            type: 'table',
+            columns: [{ key: 'name', label: 'Name', align: 'justify' }],
+            rows: []
+          }
+        ]
+      })
+    ).toThrow(YamlMarkdownValidationError);
+
+    expect(() =>
+      normalizeDocument({
+        blocks: [{ type: 'code', meta: 'title="hello.ts"', value: 'content' }]
+      })
+    ).toThrow(YamlMarkdownValidationError);
+
+    expect(() =>
+      normalizeDocument({
+        blocks: [{ type: 'code', lang: 'ts title="old.ts"', meta: 'title="hello.ts"', value: 'content' }]
       })
     ).toThrow(YamlMarkdownValidationError);
   });

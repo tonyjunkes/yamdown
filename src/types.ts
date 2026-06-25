@@ -49,12 +49,14 @@ export interface ListNode {
 }
 
 export interface ListItemNode {
+  readonly checked?: boolean;
   readonly blocks: readonly BlockNode[];
 }
 
 export interface CodeNode {
   readonly type: 'code';
   readonly lang?: string;
+  readonly meta?: string;
   readonly value: string;
 }
 
@@ -70,7 +72,10 @@ export interface ThematicBreakNode {
 export interface TableColumn {
   readonly key: string;
   readonly label: string;
+  readonly align?: TableAlignment | null;
 }
+
+export type TableAlignment = 'left' | 'center' | 'right';
 
 export interface TableNode {
   readonly type: 'table';
@@ -87,6 +92,7 @@ export type InlineNode =
   | TextInline
   | EmphasisInline
   | StrongInline
+  | DeleteInline
   | InlineCodeInline
   | LinkInline
   | ImageInline
@@ -104,6 +110,11 @@ export interface EmphasisInline {
 
 export interface StrongInline {
   readonly type: 'strong';
+  readonly children: readonly InlineNode[];
+}
+
+export interface DeleteInline {
+  readonly type: 'delete';
   readonly children: readonly InlineNode[];
 }
 

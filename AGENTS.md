@@ -3,6 +3,7 @@
 # AGENTS.md
 
 **Precedence:** explicit user instructions override this file; a closer `AGENTS.md` overrides it for files in that subtree.
+**Guidance:** if necessary, refer to plans, specs, designs, etc. found in `/docs` (if present in the project), for more context around features, design decisions, and implementation details. This directory is purposefully ignored from the repository.
 
 ## Project
 

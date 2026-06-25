@@ -82,6 +82,28 @@ describe('toMdast', () => {
     });
   });
 
+  test('produces mdast delete nodes from structured strikethrough', () => {
+    const tree = toMdast({
+      blocks: [
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'text', value: 'Keep ' },
+            { type: 'delete', children: [{ type: 'text', value: 'old wording' }] }
+          ]
+        }
+      ]
+    });
+
+    expect(tree.children[0]).toMatchObject({
+      type: 'paragraph',
+      children: [
+        { type: 'text', value: 'Keep ' },
+        { type: 'delete', children: [{ type: 'text', value: 'old wording' }] }
+      ]
+    });
+  });
+
   test('includes YAML frontmatter and respects render options', () => {
     const document = {
       frontmatter: { title: 'Example', draft: false },
@@ -95,26 +117,27 @@ describe('toMdast', () => {
     expect(toMdast(document, { frontmatter: false }).children).toMatchObject([{ type: 'heading', depth: 1 }]);
   });
 
-  test('produces standard GFM tables and task-list fields', () => {
+  test('produces standard GFM tables, task-list fields, and code metadata', () => {
     const tree = toMdast({
       blocks: [
         {
           type: 'list',
           ordered: false,
           items: [
-            { blocks: [{ type: 'paragraph', text: '[x] Complete' }] },
-            { blocks: [{ type: 'paragraph', text: '[ ] Pending' }] }
+            { checked: true, blocks: [{ type: 'paragraph', text: 'Complete' }] },
+            { checked: false, blocks: [{ type: 'paragraph', text: 'Pending' }] },
+            { blocks: [{ type: 'paragraph', text: 'Ordinary' }] }
           ]
         },
         {
           type: 'table',
           columns: [
-            { key: 'name', label: 'Name' },
-            { key: 'value', label: 'Value' }
+            { key: 'name', label: 'Name', align: 'left' },
+            { key: 'value', label: 'Value', align: 'right' }
           ],
           rows: [{ name: 'Object', value: { nested: true } }]
         },
-        { type: 'code', lang: 'ts', value: 'console.log("hello")' },
+        { type: 'code', lang: 'ts', meta: 'title="hello.ts"', value: 'console.log("hello")' },
         { type: 'html', value: '<details>Raw HTML</details>' }
       ]
     });
@@ -124,12 +147,13 @@ describe('toMdast', () => {
       ordered: false,
       children: [
         { type: 'listItem', checked: true },
-        { type: 'listItem', checked: false }
+        { type: 'listItem', checked: false },
+        { type: 'listItem', checked: null }
       ]
     });
     expect(tree.children[1]).toMatchObject({
       type: 'table',
-      align: [null, null],
+      align: ['left', 'right'],
       children: [
         {
           type: 'tableRow',
@@ -150,6 +174,7 @@ describe('toMdast', () => {
     expect(tree.children[2]).toMatchObject({
       type: 'code',
       lang: 'ts',
+      meta: 'title="hello.ts"',
       value: 'console.log("hello")'
     });
     expect(tree.children[3]).toMatchObject({ type: 'html', value: '<details>Raw HTML</details>' });

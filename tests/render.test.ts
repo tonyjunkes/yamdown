@@ -36,6 +36,14 @@ describe('renderMarkdown', () => {
     ).toBe('  indented  \n\nNext  \n');
   });
 
+  test('renders whitespace-only raw Markdown blocks as empty output', () => {
+    expect(
+      renderMarkdown({
+        blocks: [{ type: 'markdown', value: ' \t\r\n  \n' }]
+      })
+    ).toBe('\n');
+  });
+
   test('supports raw Markdown recursively in lists and blockquotes', () => {
     expect(
       renderMarkdown({
@@ -58,6 +66,23 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown(await fixture('inline-structured.yaml'))).toBe(
       'This is **bold** and [linked](https://example.com "Example").\n'
     );
+  });
+
+  test('renders structured strikethrough and escapes literal tildes', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'text', value: 'Keep ~~literal~~, remove ' },
+              { type: 'delete', children: [{ type: 'text', value: 'old' }] },
+              { type: 'text', value: '.' }
+            ]
+          }
+        ]
+      })
+    ).toBe('Keep \\~\\~literal\\~\\~, remove ~~old~~.\n');
   });
 
   test('escapes structured text without changing ordinary punctuation', async () => {
@@ -91,6 +116,29 @@ describe('renderMarkdown', () => {
     );
   });
 
+  test('renders structured task-list item state', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'list',
+            ordered: false,
+            items: [
+              { checked: true, blocks: [{ type: 'paragraph', text: 'Complete' }] },
+              { checked: false, blocks: [{ type: 'paragraph', text: 'Pending' }] },
+              { blocks: [{ type: 'paragraph', text: 'Ordinary' }] }
+            ]
+          },
+          {
+            type: 'list',
+            ordered: true,
+            items: [{ checked: true, blocks: [{ type: 'paragraph', text: 'Ordered task' }] }]
+          }
+        ]
+      })
+    ).toBe('- [x] Complete\n- [ ] Pending\n- Ordinary\n\n1. [x] Ordered task\n');
+  });
+
   test('uses a longer code fence when content contains triple backticks', async () => {
     expect(renderMarkdown(await fixture('code.yaml'))).toBe(
       ['````md', '```ts', 'console.log("hello")', '```', '````', ''].join('\n')
@@ -103,6 +151,14 @@ describe('renderMarkdown', () => {
         blocks: [{ type: 'code', lang: 'template`literal', value: '# remains code' }]
       })
     ).toBe(['~~~template`literal', '# remains code', '~~~', ''].join('\n'));
+  });
+
+  test('renders fenced code metadata and avoids backticks in info strings', () => {
+    expect(
+      renderMarkdown({
+        blocks: [{ type: 'code', lang: 'ts', meta: 'title="a`b.ts"', value: 'console.log("hello")' }]
+      })
+    ).toBe(['~~~ts title="a`b.ts"', 'console.log("hello")', '~~~', ''].join('\n'));
   });
 
   test('rejects multiline code languages', () => {
@@ -123,6 +179,25 @@ describe('renderMarkdown', () => {
         ''
       ].join('\n')
     );
+  });
+
+  test('renders table column alignment', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'table',
+            columns: [
+              { key: 'left', label: 'Left', align: 'left' },
+              { key: 'center', label: 'Center', align: 'center' },
+              { key: 'right', label: 'Right', align: 'right' },
+              { key: 'plain', label: 'Plain', align: null }
+            ],
+            rows: [{ left: 'L', center: 'C', right: 'R', plain: 'P' }]
+          }
+        ]
+      })
+    ).toBe(['| Left | Center | Right | Plain |', '| :--- | :---: | ---: | --- |', '| L | C | R | P |', ''].join('\n'));
   });
 
   test('renders table cells with deterministic scalar and structured values', () => {

@@ -81,6 +81,8 @@ function renderInlineWithContext(node: InlineNode, atLineStart: boolean): string
       return `*${renderInlineChildren(node.children, false)}*`;
     case 'strong':
       return `**${renderInlineChildren(node.children, false)}**`;
+    case 'delete':
+      return `~~${renderInlineChildren(node.children, false)}~~`;
     case 'inlineCode':
       return renderInlineCode(node.value);
     case 'link':
@@ -128,8 +130,9 @@ function renderList(node: ListNode, options: Required<RenderOptions>): string {
       const marker = node.ordered ? `${start + index}${options.orderedDelimiter}` : options.bullet;
       const body = trimTrailingLineEndings(renderBlocks(item.blocks, options));
       const lines = body.length > 0 ? body.split('\n') : [''];
+      const taskMarker = item.checked === undefined ? '' : item.checked ? '[x] ' : '[ ] ';
       const continuation = ' '.repeat(marker.length + 1);
-      const renderedLines = [`${marker} ${lines[0] ?? ''}`];
+      const renderedLines = [`${marker} ${taskMarker}${lines[0] ?? ''}`];
 
       for (const line of lines.slice(1)) {
         renderedLines.push(line.length > 0 ? `${continuation}${line}` : '');
@@ -141,13 +144,21 @@ function renderList(node: ListNode, options: Required<RenderOptions>): string {
 }
 
 function renderCode(node: CodeNode, options: Required<RenderOptions>): string {
-  const fenceCharacter = options.codeFence === '`' && node.lang?.includes('`') === true ? '~' : options.codeFence;
+  const info = renderCodeInfo(node);
+  const fenceCharacter = options.codeFence === '`' && info.includes('`') ? '~' : options.codeFence;
   const fence = createFence(node.value, fenceCharacter);
-  const info = node.lang ?? '';
   const value = node.value.replaceAll(/\r\n?/gu, '\n');
   const needsFinalLine = value.length === 0 || !value.endsWith('\n');
 
   return `${fence}${info}\n${value}${needsFinalLine ? '\n' : ''}${fence}`;
+}
+
+function renderCodeInfo(node: CodeNode): string {
+  if (node.meta === undefined) {
+    return node.lang ?? '';
+  }
+
+  return `${node.lang ?? ''} ${node.meta}`;
 }
 
 function renderBlockquote(node: BlockquoteNode, options: Required<RenderOptions>): string {
@@ -164,12 +175,28 @@ function renderBlocks(blocks: readonly BlockNode[], options: Required<RenderOpti
 
 function renderTable(node: TableNode): string {
   const header = `| ${node.columns.map((column) => escapeTableCell(column.label)).join(' | ')} |`;
-  const separator = `| ${node.columns.map(() => '---').join(' | ')} |`;
+  const separator = `| ${node.columns.map((column) => renderTableDelimiter(column.align)).join(' | ')} |`;
   const rows = node.rows.map(
     (row) => `| ${node.columns.map((column) => escapeTableCell(renderCellValue(row[column.key]))).join(' | ')} |`
   );
 
   return [header, separator, ...rows].join('\n');
+}
+
+function renderTableDelimiter(align: TableNode['columns'][number]['align']): string {
+  if (align === 'left') {
+    return ':---';
+  }
+
+  if (align === 'center') {
+    return ':---:';
+  }
+
+  if (align === 'right') {
+    return '---:';
+  }
+
+  return '---';
 }
 
 function renderFrontmatter(frontmatter: Record<string, unknown>): string {
@@ -222,7 +249,7 @@ function escapeStructuredText(value: string, initiallyAtLineStart: boolean): str
   return lines
     .map((line, index) => {
       const atLineStart = index > 0 || initiallyAtLineStart;
-      const escapedLine = line.replaceAll(/\\|`|\*|_|\[|\]|<|>|&/gu, '\\$&');
+      const escapedLine = line.replaceAll(/\\|`|\*|_|~|\[|\]|<|>|&/gu, '\\$&');
       return atLineStart ? escapeBlockMarker(escapedLine) : escapedLine;
     })
     .join('\n');

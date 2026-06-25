@@ -1,6 +1,6 @@
 {
   "name": "yamdown",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "Structured YAML authoring for deterministic Markdown output.",
   "keywords": [
@@ -70,7 +70,7 @@
     "@typescript/native-preview": "npm:typescript@7.0.1-rc",
     "@vitest/coverage-v8": "4.1.9",
     "oxfmt": "^0.55.0",
-    "oxlint": "^1.70.0",
+    "oxlint": "^1.71.0",
     "oxlint-tsgolint": "^0.23.0",
     "tsdown": "^0.22.3",
     "typescript": "npm:@typescript/typescript6@^6.0.1",

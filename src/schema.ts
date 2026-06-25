@@ -1,8 +1,32 @@
 import { z } from 'zod';
-import type { BlockNode, InlineNode, ListItemNode, ParagraphNode, YamlMarkdownDocument } from './types.js';
+import type { BlockNode, CodeNode, InlineNode, ListItemNode, ParagraphNode, YamlMarkdownDocument } from './types.js';
 
 const frontmatterSchema = z.record(z.string(), z.unknown());
 const depthSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]);
+const tableAlignmentSchema = z.union([z.literal('left'), z.literal('center'), z.literal('right')]);
+const codeLanguageSchema = z.string().regex(/^[^\r\n]*$/u, 'Code language must be a single line');
+const codeInfoPartSchema = z.string().regex(/^[^\r\n]*$/u, 'Code metadata must be a single-line string');
+const codeMetaSchema = codeInfoPartSchema
+  .refine((value) => value.trim() === value, 'Code metadata must not have leading or trailing whitespace')
+  .refine((value) => value.length > 0, 'Code metadata must not be empty');
+
+const tableColumnSchema = z
+  .object({
+    key: z.string(),
+    label: z.string(),
+    align: tableAlignmentSchema.nullable().optional()
+  })
+  .strict();
+
+const codeSchema: z.ZodType<CodeNode> = z
+  .object({
+    type: z.literal('code'),
+    lang: codeLanguageSchema.optional(),
+    meta: codeMetaSchema.optional(),
+    value: z.string()
+  })
+  .strict()
+  .superRefine(addCodeMetadataIssues);
 
 export const inlineNodeSchema: z.ZodType<InlineNode> = z.lazy(() =>
   z.union([
@@ -21,6 +45,12 @@ export const inlineNodeSchema: z.ZodType<InlineNode> = z.lazy(() =>
     z
       .object({
         type: z.literal('strong'),
+        children: z.array(inlineNodeSchema)
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal('delete'),
         children: z.array(inlineNodeSchema)
       })
       .strict(),
@@ -96,6 +126,7 @@ const headingSchema = z.union([
 export const listItemSchema: z.ZodType<ListItemNode> = z.lazy(() =>
   z
     .object({
+      checked: z.boolean().optional(),
       blocks: z.array(blockNodeSchema)
     })
     .strict()
@@ -114,16 +145,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
         items: z.array(listItemSchema)
       })
       .strict(),
-    z
-      .object({
-        type: z.literal('code'),
-        lang: z
-          .string()
-          .regex(/^[^\r\n]*$/u, 'Code language must be a single line')
-          .optional(),
-        value: z.string()
-      })
-      .strict(),
+    codeSchema,
     z
       .object({
         type: z.literal('blockquote'),
@@ -138,14 +160,7 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
     z
       .object({
         type: z.literal('table'),
-        columns: z.array(
-          z
-            .object({
-              key: z.string(),
-              label: z.string()
-            })
-            .strict()
-        ),
+        columns: z.array(tableColumnSchema),
         rows: z.array(z.record(z.string(), z.unknown()))
       })
       .strict(),
@@ -167,14 +182,7 @@ export const yamlMarkdownDocumentSchema: z.ZodType<YamlMarkdownDocument> = z
 
 const tableBodySchema = z
   .object({
-    columns: z.array(
-      z
-        .object({
-          key: z.string(),
-          label: z.string()
-        })
-        .strict()
-    ),
+    columns: z.array(tableColumnSchema),
     rows: z.array(z.record(z.string(), z.unknown()))
   })
   .strict();
@@ -185,6 +193,7 @@ const sourceListItemSchema: z.ZodType = z.lazy(() =>
     z.array(sourceBlockNodeSchema),
     z
       .object({
+        checked: z.boolean().optional(),
         blocks: z.array(sourceBlockNodeSchema)
       })
       .strict()
@@ -204,16 +213,7 @@ const sourceBlockNodeSchema: z.ZodType = z.lazy(() =>
         items: z.array(sourceListItemSchema)
       })
       .strict(),
-    z
-      .object({
-        type: z.literal('code'),
-        lang: z
-          .string()
-          .regex(/^[^\r\n]*$/u, 'Code language must be a single line')
-          .optional(),
-        value: z.string()
-      })
-      .strict(),
+    codeSchema,
     z
       .object({
         type: z.literal('blockquote'),
@@ -243,13 +243,12 @@ const sourceBlockNodeSchema: z.ZodType = z.lazy(() =>
           z.string(),
           z
             .object({
-              lang: z
-                .string()
-                .regex(/^[^\r\n]*$/u, 'Code language must be a single line')
-                .optional(),
+              lang: codeLanguageSchema.optional(),
+              meta: codeMetaSchema.optional(),
               value: z.string()
             })
             .strict()
+            .superRefine(addCodeMetadataIssues)
         ])
       })
       .strict(),
@@ -268,3 +267,29 @@ export const sourceDocumentSchema: z.ZodType = z
     blocks: z.array(sourceBlockNodeSchema)
   })
   .strict();
+
+function addCodeMetadataIssues(
+  node: { readonly lang?: string; readonly meta?: string },
+  context: z.RefinementCtx
+): void {
+  if (node.meta === undefined) {
+    return;
+  }
+
+  if (node.lang === undefined || node.lang.length === 0) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Code metadata requires a language identifier',
+      path: ['meta']
+    });
+    return;
+  }
+
+  if (/\s/u.test(node.lang)) {
+    context.addIssue({
+      code: 'custom',
+      message: 'Code language must not contain whitespace when metadata is set',
+      path: ['lang']
+    });
+  }
+}

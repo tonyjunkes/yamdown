@@ -118,10 +118,27 @@ Most common blocks also have a compact shorthand:
 | Table          | `table`         | `table`           |
 
 Lists may contain strings for simple items or nested block arrays for richer
-content. Table shorthand wraps the same `columns` and `rows` fields as the
-verbose node. Code fences automatically grow when their contents include the chosen
-fence character. Code language identifiers must be single-line strings; when an
-identifier contains a backtick, the renderer uses a tilde fence.
+content. Add `checked: true` or `checked: false` to a list item when you want a
+GFM task-list marker; omit it for ordinary list items.
+
+Table shorthand wraps the same `columns` and `rows` fields as the verbose node.
+Columns may set `align` to `left`, `center`, `right`, or `null`/omitted for no
+alignment.
+
+Code fences automatically grow when their contents include the chosen fence
+character. Code language identifiers must be single-line strings. Use `meta` to
+preserve the text after the language identifier in the fenced-code info string:
+
+```yaml
+blocks:
+  - code:
+      lang: ts
+      meta: title="example.ts"
+      value: |
+        console.log("hello")
+```
+
+When an info string contains a backtick, the renderer uses a tilde fence.
 
 ### Raw Markdown escape hatch
 
@@ -183,8 +200,8 @@ blocks:
         value: '.'
 ```
 
-Supported inline nodes are `text`, `emphasis`, `strong`, `inlineCode`, `link`,
-`image`, and `break`.
+Supported inline nodes are `text`, `emphasis`, `strong`, `delete`, `inlineCode`,
+`link`, `image`, and `break`.
 
 > [!WARNING]
 > Raw Markdown—including paragraph and heading `text`—and `html` blocks are intentionally trusted and are not
