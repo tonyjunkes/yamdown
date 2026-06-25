@@ -5,7 +5,7 @@ export default defineConfig({
   dts: {
     tsgo: true
   },
-  entry: ['src/index.ts', 'src/cli.ts'],
+  entry: ['src/index.ts', 'src/cli.ts', 'src/json-schema.ts'],
   format: ['esm'],
   sourcemap: true
 });

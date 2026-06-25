@@ -1,6 +1,6 @@
 // @ts-check
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -62,6 +62,35 @@ try {
   if (stdout !== '# Installed\n') {
     throw new Error(`Unexpected CLI output: ${JSON.stringify(stdout)}`);
   }
+
+  const schemaPath = join(consumerDirectory, 'node_modules', 'yamdown', 'schema', 'yamdown.schema.json');
+  /** @type {unknown} */
+  const schema = JSON.parse(await readFile(schemaPath, 'utf8'));
+  if (!isYamdownSchemaSummary(schema)) {
+    throw new Error(`Unexpected packaged schema: ${JSON.stringify(schema)}`);
+  }
+
+  const { stdout: schemaStdout } = await runPnpm(['exec', 'yamdown', '--schema'], consumerDirectory);
+  if (JSON.stringify(JSON.parse(schemaStdout)) !== JSON.stringify(schema)) {
+    throw new Error('CLI schema output did not match the packaged schema file.');
+  }
+
+  const { stdout: schemaExportStdout } = await runNode(
+    [
+      '--input-type=module',
+      '--eval',
+      [
+        "const schemaUrl = import.meta.resolve('yamdown/schema.json');",
+        'const schema = await import(schemaUrl, { with: { type: "json" } });',
+        "if (schema.default?.title !== 'Yamdown authoring document') throw new Error('Schema export failed');"
+      ].join('\n')
+    ],
+    consumerDirectory
+  );
+
+  if (schemaExportStdout !== '') {
+    throw new Error(`Unexpected schema export stdout: ${JSON.stringify(schemaExportStdout)}`);
+  }
 } finally {
   await rm(temporaryDirectory, { force: true, recursive: true });
 }
@@ -85,4 +114,21 @@ function runNode(arguments_, cwd) {
     env: process.env,
     maxBuffer: 10 * 1024 * 1024
   });
+}
+
+/**
+ * @param {unknown} value parsed JSON
+ * @returns {value is { $schema: string, required: string[] }} true when the value has the expected schema summary
+ */
+function isYamdownSchemaSummary(value) {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    '$schema' in value &&
+    value.$schema === 'https://json-schema.org/draft/2020-12/schema' &&
+    'required' in value &&
+    Array.isArray(value.required) &&
+    value.required.includes('blocks')
+  );
 }

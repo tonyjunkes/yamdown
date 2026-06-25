@@ -11,7 +11,13 @@ export { toMdast } from './mdast.js';
 export { normalizeDocument } from './normalize.js';
 export { parseYamlMarkdown } from './parse.js';
 export { renderBlock, renderDocument, renderInline, renderMarkdown } from './render.js';
-export { blockNodeSchema, inlineNodeSchema, listItemSchema, yamlMarkdownDocumentSchema } from './schema.js';
+export {
+  blockNodeSchema,
+  inlineNodeSchema,
+  listItemSchema,
+  sourceDocumentSchema as yamlMarkdownSourceDocumentSchema,
+  yamlMarkdownDocumentSchema
+} from './schema.js';
 export type {
   BlockNode,
   BlockquoteNode,

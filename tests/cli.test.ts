@@ -83,6 +83,32 @@ describe('runCli', () => {
     expect(stdout.value).toBe('');
   });
 
+  test('prints the authoring JSON Schema without an input file', async () => {
+    const stdout = new MemoryStream();
+    const stderr = new MemoryStream();
+
+    const exitCode = await runCli(['node', 'yamdown', '--schema'], { stderr, stdout });
+
+    expect(exitCode).toBe(0);
+    expect(stderr.value).toBe('');
+    expect(JSON.parse(stdout.value)).toMatchObject({
+      $schema: 'https://json-schema.org/draft/2020-12/schema',
+      title: 'Yamdown authoring document',
+      required: ['blocks']
+    });
+  });
+
+  test('rejects schema output when combined with rendering options', async () => {
+    const stdout = new MemoryStream();
+    const stderr = new MemoryStream();
+
+    const exitCode = await runCli(['node', 'yamdown', '--schema', '--check', 'input.yaml'], { stderr, stdout });
+
+    expect(exitCode).toBe(1);
+    expect(stdout.value).toBe('');
+    expect(stderr.value).toContain('--schema cannot be combined with an input file, --check, or --output');
+  });
+
   test('returns non-zero for invalid documents', async () => {
     const input = join(dir, 'input.yaml');
     const stderr = new MemoryStream();
@@ -193,8 +219,9 @@ describe('runCli', () => {
     const exitCode = await runCli(['node', 'yamdown', '--help'], { stderr, stdout });
 
     expect(exitCode).toBe(0);
-    expect(stdout.value).toContain('Usage: yamdown [options] <input>');
+    expect(stdout.value).toContain('Usage: yamdown [options] [input]');
     expect(stdout.value).toContain('Author deterministic Markdown with structured YAML.');
+    expect(stdout.value).toContain('--schema');
     expect(stderr.value).toBe('');
   });
 

@@ -1,6 +1,6 @@
 {
   "name": "yamdown",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "private": true,
   "description": "Structured YAML authoring for deterministic Markdown output.",
   "keywords": [
@@ -28,6 +28,7 @@
   },
   "files": [
     "dist",
+    "schema",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -37,7 +38,8 @@
     ".": {
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
-    }
+    },
+    "./schema.json": "./schema/yamdown.schema.json"
   },
   "scripts": {
     "build": "tsdown",
@@ -50,6 +52,7 @@
     "lint": "oxlint",
     "lint:fix": "oxlint --fix",
     "lint:github": "oxlint --format=github",
+    "schema:generate": "pnpm run build && node scripts/generate-schema.mjs",
     "pack:check": "pnpm pack --dry-run",
     "test:package": "node scripts/smoke-package.mjs",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run fmt:check && pnpm run test && pnpm run build && pnpm run test:package"
@@ -69,6 +72,7 @@
     "@types/node": "^26.0.0",
     "@typescript/native-preview": "npm:typescript@7.0.1-rc",
     "@vitest/coverage-v8": "4.1.9",
+    "ajv": "^8.20.0",
     "oxfmt": "^0.55.0",
     "oxlint": "^1.71.0",
     "oxlint-tsgolint": "^0.23.0",

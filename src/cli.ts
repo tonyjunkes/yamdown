@@ -11,6 +11,7 @@ interface CliOptions {
   check?: boolean;
   debug?: boolean;
   output?: string;
+  schema?: boolean;
 }
 
 interface WritableStreamLike {
@@ -33,10 +34,11 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
   program
     .name('yamdown')
     .description('Author deterministic Markdown with structured YAML.')
-    .argument('<input>', 'YAML input file')
+    .argument('[input]', 'YAML input file')
     .option('-o, --output <file>', 'write Markdown to a file')
     .option('--check', 'validate input without rendering Markdown')
     .option('--debug', 'print stack traces for unexpected errors')
+    .option('--schema', 'print the Yamdown authoring JSON Schema')
     .exitOverride()
     .configureOutput({
       writeErr: (value) => {
@@ -46,7 +48,21 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
         io.stdout.write(value);
       }
     })
-    .action(async (input: string, options: CliOptions) => {
+    .action(async (input: string | undefined, options: CliOptions) => {
+      if (options.schema === true) {
+        if (input !== undefined || options.check === true || options.output !== undefined) {
+          program.error('--schema cannot be combined with an input file, --check, or --output');
+        }
+
+        io.stdout.write(await readFile(new URL('../schema/yamdown.schema.json', import.meta.url), 'utf8'));
+        return;
+      }
+
+      if (input === undefined) {
+        program.error("missing required argument 'input'");
+        return;
+      }
+
       inputPath = input;
       const yaml = await readFile(input, 'utf8');
       inputSource = yaml;

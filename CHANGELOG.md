@@ -3,6 +3,18 @@
 All notable changes to Yamdown are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.6.0 - 2026-06-25
+
+### Added
+
+- Draft 2020-12 JSON Schema for Yamdown authoring input, covering verbose nodes,
+  shorthand forms, and structured GFM additions.
+- Stable packaged schema access through `schema/yamdown.schema.json` and the
+  `yamdown/schema.json` package export.
+- `yamdown --schema` for printing the authoring schema to stdout.
+- Editor integration docs and schema conformance coverage against runtime
+  validation.
+
 ## 0.5.0 - 2026-06-24
 
 ### Added

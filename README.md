@@ -3,6 +3,8 @@
 </p>
 <h1 align="center">Yamdown</h1>
 
+[![CI Build](https://github.com/tonyjunkes/yamdown/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tonyjunkes/yamdown/actions/workflows/ci.yml)
+
 Yamdown is a structured YAML authoring format for generating deterministic,
 human-readable Markdown.
 
@@ -124,6 +126,42 @@ GFM task-list marker; omit it for ordinary list items.
 Table shorthand wraps the same `columns` and `rows` fields as the verbose node.
 Columns may set `align` to `left`, `center`, `right`, or `null`/omitted for no
 alignment.
+
+### Editor schema
+
+Yamdown ships a Draft 2020-12 JSON Schema for YAML-aware editors. The schema
+validates the authoring shape before normalization, so it covers both verbose
+nodes and shorthand forms.
+
+When installed from a workspace or tarball, the stable schema path is:
+
+```text
+node_modules/yamdown/schema/yamdown.schema.json
+```
+
+Tools that understand package exports can also resolve:
+
+```text
+yamdown/schema.json
+```
+
+For the VS Code YAML language server, map the packaged schema file to the YAML
+files that should use Yamdown validation:
+
+```json
+{
+  "yaml.schemas": {
+    "./node_modules/yamdown/schema/yamdown.schema.json": ["yamdown*.yaml", "*.yamdown.yaml"]
+  }
+}
+```
+
+For integrations that cannot resolve package files directly, the CLI can print
+the same schema to stdout:
+
+```bash
+yamdown --schema > yamdown.schema.json
+```
 
 Code fences automatically grow when their contents include the chosen fence
 character. Code language identifiers must be single-line strings. Use `meta` to
@@ -247,15 +285,16 @@ const tree = toMdast(normalized);
 
 Key exports:
 
-| Export                        | Purpose                                                |
-| ----------------------------- | ------------------------------------------------------ |
-| `parseYamlMarkdown`           | Parse YAML and return a validated normalized document  |
-| `normalizeDocument`           | Expand shorthand and validate an unknown input value   |
-| `renderMarkdown`              | Parse or normalize input and render complete Markdown  |
-| `renderDocument`              | Render an already validated document                   |
-| `renderBlock`, `renderInline` | Render individual document nodes                       |
-| `toMdast`                     | Convert YAML or a document to an official `mdast.Root` |
-| `yamlMarkdownDocumentSchema`  | Validate with the public Zod document schema           |
+| Export                             | Purpose                                                |
+| ---------------------------------- | ------------------------------------------------------ |
+| `parseYamlMarkdown`                | Parse YAML and return a validated normalized document  |
+| `normalizeDocument`                | Expand shorthand and validate an unknown input value   |
+| `renderMarkdown`                   | Parse or normalize input and render complete Markdown  |
+| `renderDocument`                   | Render an already validated document                   |
+| `renderBlock`, `renderInline`      | Render individual document nodes                       |
+| `toMdast`                          | Convert YAML or a document to an official `mdast.Root` |
+| `yamlMarkdownDocumentSchema`       | Validate with the public Zod document schema           |
+| `yamlMarkdownSourceDocumentSchema` | Validate the pre-normalization authoring shape         |
 
 Public node types, schemas, source-range types, and error classes are also
 exported from the package root.
@@ -312,20 +351,24 @@ const markdown = renderMarkdown(document, {
 ## CLI
 
 ```text
-yamdown <input> [options]
+yamdown [input] [options]
 
 -o, --output <file>  Write Markdown to a file
 --check               Validate without rendering Markdown
 --debug               Include stack traces for unexpected errors
+--schema              Print the Yamdown authoring JSON Schema
 ```
 
 Without `--output`, rendered Markdown is written to stdout. Validation and file
-errors are written to stderr and return a non-zero exit code.
+errors are written to stderr and return a non-zero exit code. `--schema` does
+not read an input file and cannot be combined with an input file, `--check`, or
+`--output`.
 
 ```bash
 yamdown document.yaml
 yamdown document.yaml -o README.md
 yamdown --check document.yaml
+yamdown --schema
 ```
 
 ## Diagnostics
@@ -353,6 +396,7 @@ pnpm run lint          # oxlint checks
 pnpm run fmt:check     # formatting check
 pnpm run test          # Vitest suite
 pnpm run build         # package build
+pnpm run schema:generate # rebuild the committed editor schema
 pnpm run build && pnpm run test:package # install and exercise a local tarball
 pnpm run check         # run the complete validation pipeline
 ```
@@ -367,5 +411,4 @@ Yamdown v1 is not a Markdown superset and does not parse Markdown back into
 YAML. It does not provide Markdown AST round-tripping, sanitize Markdown or
 HTML, support MDX or execute plugins, load remote files, or provide watch mode.
 
-Planned areas include broader Yamdown node coverage, generated editor schemas,
-and richer CLI workflows.
+Planned areas include broader Yamdown node coverage and richer CLI workflows.
