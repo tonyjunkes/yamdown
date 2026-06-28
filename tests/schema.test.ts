@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { AnySchema } from 'ajv/dist/2020.js';
 import { describe, expect, test } from 'vitest';
-import { normalizeDocument, yamlMarkdownSourceDocumentSchema } from '../src/index.js';
-import { createYamlMarkdownJsonSchema } from '../src/json-schema.js';
+import { normalizeDocument, yamdownSourceDocumentSchema } from '../src/index.js';
+import { createYamdownJsonSchema } from '../src/json-schema.js';
 
 const schemaPath = join(import.meta.dirname, '..', 'schema', 'yamdown.schema.json');
 
@@ -23,7 +23,7 @@ function createValidator(schema: unknown): (input: unknown) => boolean {
 
 describe('Yamdown authoring JSON Schema', () => {
   test('keeps the committed schema in sync with the source Zod schema', async () => {
-    expect(await readCommittedSchema()).toEqual(createYamlMarkdownJsonSchema());
+    expect(await readCommittedSchema()).toEqual(createYamdownJsonSchema());
   });
 
   test('validates representative accepted authoring shapes', async () => {
@@ -79,16 +79,33 @@ describe('Yamdown authoring JSON Schema', () => {
               title: 'Example',
               children: [{ type: 'text', value: 'link' }]
             },
+            {
+              type: 'linkReference',
+              identifier: 'docs',
+              children: [{ type: 'text', value: 'Docs' }]
+            },
             { type: 'image', url: '/logo.png', alt: 'Logo', title: 'Image title' },
+            { type: 'imageReference', identifier: 'logo', alt: 'Logo' },
+            { type: 'footnoteReference', identifier: 'note-1' },
             { type: 'break' }
           ]
         },
-        { type: 'code', lang: 'js', meta: 'title="verbose.js"', value: 'console.log("verbose")' }
+        {
+          type: 'table',
+          columns: [{ key: 'rich', label: 'Rich' }],
+          rows: [
+            { rich: { type: 'inline', children: [{ type: 'strong', children: [{ type: 'text', value: 'Cell' }] }] } }
+          ]
+        },
+        { type: 'code', lang: 'js', meta: 'title="verbose.js"', value: 'console.log("verbose")' },
+        { type: 'definition', identifier: 'docs', url: 'https://example.com/docs' },
+        { type: 'definition', identifier: 'logo', url: '/logo.png' },
+        { type: 'footnoteDefinition', identifier: 'note-1', blocks: [{ p: 'Footnote body' }] }
       ]
     };
 
     expect(validate(input)).toBe(true);
-    expect(yamlMarkdownSourceDocumentSchema.safeParse(input).success).toBe(true);
+    expect(yamdownSourceDocumentSchema.safeParse(input).success).toBe(true);
     expect(() => normalizeDocument(input)).not.toThrow();
   });
 
@@ -111,13 +128,49 @@ describe('Yamdown authoring JSON Schema', () => {
     [
       'code metadata with surrounding whitespace',
       { blocks: [{ code: { lang: 'ts', meta: ' title="example.ts"', value: 'content' } }] }
+    ],
+    ['invalid definition identifier', { blocks: [{ type: 'definition', identifier: 'not valid', url: '/docs' }] }],
+    [
+      'nested definition',
+      {
+        blocks: [
+          { type: 'blockquote', blocks: [{ type: 'definition', identifier: 'nested', url: 'https://example.com' }] }
+        ]
+      }
+    ],
+    [
+      'malformed tagged table cell',
+      {
+        blocks: [
+          {
+            type: 'table',
+            columns: [{ key: 'value', label: 'Value' }],
+            rows: [{ value: { type: 'inline', children: [{ type: 'unknown' }] } }]
+          }
+        ]
+      }
     ]
   ])('rejects %s through schema and runtime validation', async (_label, input) => {
     const validate = createValidator(await readCommittedSchema());
 
     expect(validate(input)).toBe(false);
-    expect(yamlMarkdownSourceDocumentSchema.safeParse(input).success).toBe(false);
-    expect(() => normalizeDocument(input)).toThrow(/Invalid YAML Markdown document/u);
+    expect(yamdownSourceDocumentSchema.safeParse(input).success).toBe(false);
+    expect(() => normalizeDocument(input)).toThrow(/Invalid Yamdown document/u);
+  });
+
+  test('leaves document-wide reference integrity authoritative at runtime', async () => {
+    const validate = createValidator(await readCommittedSchema());
+    const unresolved = {
+      blocks: [
+        {
+          type: 'paragraph',
+          children: [{ type: 'footnoteReference', identifier: 'missing' }]
+        }
+      ]
+    };
+
+    expect(validate(unresolved)).toBe(true);
+    expect(() => normalizeDocument(unresolved)).toThrow(/Unresolved footnote reference/u);
   });
 });
 

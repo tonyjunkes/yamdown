@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, test } from 'vitest';
 import { runCli } from '../src/cli.js';
 
+const schemaPath = join(import.meta.dirname, '..', 'schema', 'yamdown.schema.json');
+
 class MemoryStream {
   public value = '';
 
@@ -91,6 +93,7 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(0);
     expect(stderr.value).toBe('');
+    expect(stdout.value).toBe(await readFile(schemaPath, 'utf8'));
     expect(JSON.parse(stdout.value)).toMatchObject({
       $schema: 'https://json-schema.org/draft/2020-12/schema',
       title: 'Yamdown authoring document',
@@ -98,11 +101,15 @@ describe('runCli', () => {
     });
   });
 
-  test('rejects schema output when combined with rendering options', async () => {
+  test.each([
+    ['an input file', ['input.yaml']],
+    ['--check', ['--check']],
+    ['--output', ['--output', 'output.md']]
+  ])('rejects schema output when combined with %s', async (_label, arguments_) => {
     const stdout = new MemoryStream();
     const stderr = new MemoryStream();
 
-    const exitCode = await runCli(['node', 'yamdown', '--schema', '--check', 'input.yaml'], { stderr, stdout });
+    const exitCode = await runCli(['node', 'yamdown', '--schema', ...arguments_], { stderr, stdout });
 
     expect(exitCode).toBe(1);
     expect(stdout.value).toBe('');
@@ -120,7 +127,7 @@ describe('runCli', () => {
     });
 
     expect(exitCode).toBe(1);
-    expect(stderr.value).toMatch(/Invalid YAML Markdown document/u);
+    expect(stderr.value).toMatch(/Invalid Yamdown document/u);
     expect(stderr.value).toContain(`${input}:3:12 error:`);
     expect(stderr.value).toContain('3 |     depth: 9');
     expect(stderr.value).toContain('|            ^');
@@ -182,7 +189,7 @@ describe('runCli', () => {
     });
 
     expect(exitCode).toBe(1);
-    expect(stderr.value).toBe('Invalid YAML Markdown document: Invalid input: expected object, received null\n');
+    expect(stderr.value).toBe('Invalid Yamdown document: Invalid input: expected object, received null\n');
   });
 
   test('prints unexpected error stacks in debug mode', async () => {

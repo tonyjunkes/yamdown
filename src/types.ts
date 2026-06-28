@@ -1,7 +1,9 @@
-export interface YamlMarkdownDocument {
+export interface YamdownDocument {
   readonly frontmatter?: Readonly<Record<string, unknown>>;
-  readonly blocks: readonly BlockNode[];
+  readonly blocks: readonly DocumentNode[];
 }
+
+export type DocumentNode = BlockNode | DefinitionNode | FootnoteDefinitionNode;
 
 export type BlockNode =
   | HeadingNode
@@ -83,6 +85,24 @@ export interface TableNode {
   readonly rows: readonly Record<string, unknown>[];
 }
 
+export interface TableInlineCell {
+  readonly type: 'inline';
+  readonly children: readonly InlineNode[];
+}
+
+export interface DefinitionNode {
+  readonly type: 'definition';
+  readonly identifier: string;
+  readonly url: string;
+  readonly title?: string;
+}
+
+export interface FootnoteDefinitionNode {
+  readonly type: 'footnoteDefinition';
+  readonly identifier: string;
+  readonly blocks: readonly BlockNode[];
+}
+
 export interface HtmlNode {
   readonly type: 'html';
   readonly value: string;
@@ -95,7 +115,10 @@ export type InlineNode =
   | DeleteInline
   | InlineCodeInline
   | LinkInline
+  | LinkReferenceInline
   | ImageInline
+  | ImageReferenceInline
+  | FootnoteReferenceInline
   | BreakInline;
 
 export interface TextInline {
@@ -130,11 +153,28 @@ export interface LinkInline {
   readonly children: readonly InlineNode[];
 }
 
+export interface LinkReferenceInline {
+  readonly type: 'linkReference';
+  readonly identifier: string;
+  readonly children: readonly InlineNode[];
+}
+
 export interface ImageInline {
   readonly type: 'image';
   readonly url: string;
   readonly alt?: string;
   readonly title?: string;
+}
+
+export interface ImageReferenceInline {
+  readonly type: 'imageReference';
+  readonly identifier: string;
+  readonly alt?: string;
+}
+
+export interface FootnoteReferenceInline {
+  readonly type: 'footnoteReference';
+  readonly identifier: string;
 }
 
 export interface BreakInline {

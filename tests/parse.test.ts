@@ -1,32 +1,32 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { YamlMarkdownParseError, YamlMarkdownValidationError, parseYamlMarkdown } from '../src/index.js';
+import { YamdownValidationError, YamdownYamlParseError, parseYamlDocument } from '../src/index.js';
 
 const fixtureDir = join(import.meta.dirname, 'fixtures');
 
-function expectParseError(error: unknown): YamlMarkdownParseError {
-  expect(error).toBeInstanceOf(YamlMarkdownParseError);
-  if (!(error instanceof YamlMarkdownParseError)) {
-    throw new Error('Expected YamlMarkdownParseError');
+function expectParseError(error: unknown): YamdownYamlParseError {
+  expect(error).toBeInstanceOf(YamdownYamlParseError);
+  if (!(error instanceof YamdownYamlParseError)) {
+    throw new Error('Expected YamdownYamlParseError');
   }
 
   return error;
 }
 
-function expectValidationError(error: unknown): YamlMarkdownValidationError {
-  expect(error).toBeInstanceOf(YamlMarkdownValidationError);
-  if (!(error instanceof YamlMarkdownValidationError)) {
-    throw new Error('Expected YamlMarkdownValidationError');
+function expectValidationError(error: unknown): YamdownValidationError {
+  expect(error).toBeInstanceOf(YamdownValidationError);
+  if (!(error instanceof YamdownValidationError)) {
+    throw new Error('Expected YamdownValidationError');
   }
 
   return error;
 }
 
-describe('parseYamlMarkdown', () => {
+describe('parseYamlDocument', () => {
   test('parses valid YAML into a normalized document', () => {
     expect(
-      parseYamlMarkdown(`
+      parseYamlDocument(`
 blocks:
   - h2: Hello
 `)
@@ -38,12 +38,13 @@ blocks:
   test('throws a parse error for invalid YAML', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('blocks: [');
+      parseYamlDocument('blocks: [');
     } catch (error) {
       caught = error;
     }
 
     const parseError = expectParseError(caught);
+    expect(parseError.name).toBe('YamdownYamlParseError');
     expect(parseError.location?.start.line).toBe(1);
     expect(parseError.location?.start.column).toBeGreaterThan(0);
   });
@@ -53,20 +54,22 @@ blocks:
 
     let caught: unknown;
     try {
-      parseYamlMarkdown(invalid);
+      parseYamlDocument(invalid);
     } catch (error) {
       caught = error;
     }
 
-    const { issues, message } = expectValidationError(caught);
+    const validationError = expectValidationError(caught);
+    const { issues, message } = validationError;
+    expect(validationError.name).toBe('YamdownValidationError');
     expect(issues[0]?.path).toContain('blocks');
-    expect(message).toMatch(/Invalid YAML Markdown document/u);
+    expect(message).toMatch(/Invalid Yamdown document/u);
   });
 
   test('maps shorthand validation errors to exact YAML ranges with CRLF input', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('blocks:\r\n  - h2: 42\r\n');
+      parseYamlDocument('blocks:\r\n  - h2: 42\r\n');
     } catch (error) {
       caught = error;
     }
@@ -84,7 +87,7 @@ blocks:
   test('maps scalar shorthand fields introduced by normalization', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('blocks:\n  - html: 42\n');
+      parseYamlDocument('blocks:\n  - html: 42\n');
     } catch (error) {
       caught = error;
     }
@@ -99,7 +102,7 @@ blocks:
   test('rejects the removed document title at its source location', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('title: Legacy\nblocks: []\n');
+      parseYamlDocument('title: Legacy\nblocks: []\n');
     } catch (error) {
       caught = error;
     }
@@ -114,7 +117,7 @@ blocks:
   test('falls back to the nearest YAML parent for a missing property', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('blocks:\n  - type: heading\n    depth: 2\n');
+      parseYamlDocument('blocks:\n  - type: heading\n    depth: 2\n');
     } catch (error) {
       caught = error;
     }
@@ -127,7 +130,7 @@ blocks:
   test('reports malformed Markdown shorthand at its source value', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('blocks:\n  - markdown:\n      nested: invalid\n');
+      parseYamlDocument('blocks:\n  - markdown:\n      nested: invalid\n');
     } catch (error) {
       caught = error;
     }
@@ -142,7 +145,7 @@ blocks:
   test('reports malformed table shorthand at its source field', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('blocks:\n  - table:\n      columns: invalid\n      rows: []\n');
+      parseYamlDocument('blocks:\n  - table:\n      columns: invalid\n      rows: []\n');
     } catch (error) {
       caught = error;
     }
@@ -157,7 +160,7 @@ blocks:
   test('reports malformed code metadata at its source field', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('blocks:\n  - code:\n      meta: title="example.ts"\n      value: content\n');
+      parseYamlDocument('blocks:\n  - code:\n      meta: title="example.ts"\n      value: content\n');
     } catch (error) {
       caught = error;
     }
@@ -172,7 +175,7 @@ blocks:
   test('reports malformed task-list state at its source field', () => {
     let caught: unknown;
     try {
-      parseYamlMarkdown('blocks:\n  - ul:\n      - checked: yes\n        blocks: []\n');
+      parseYamlDocument('blocks:\n  - ul:\n      - checked: yes\n        blocks: []\n');
     } catch (error) {
       caught = error;
     }
@@ -181,6 +184,23 @@ blocks:
     expect(validationError.issues[0]).toMatchObject({
       path: ['blocks', 0, 'ul', 0, 'checked'],
       location: { start: { line: 3, column: 18 } }
+    });
+  });
+
+  test('reports unresolved references at their YAML identifier', () => {
+    let caught: unknown;
+    try {
+      parseYamlDocument(
+        'blocks:\n  - type: paragraph\n    children:\n      - type: footnoteReference\n        identifier: missing\n'
+      );
+    } catch (error) {
+      caught = error;
+    }
+
+    const validationError = expectValidationError(caught);
+    expect(validationError.issues[0]).toMatchObject({
+      path: ['blocks', 0, 'children', 0, 'identifier'],
+      location: { start: { line: 5, column: 21 } }
     });
   });
 });

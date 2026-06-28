@@ -36,20 +36,35 @@ try {
 
   await runPnpm(['add', '--ignore-scripts', tarball], consumerDirectory);
 
+  const declarations = await readFile(
+    join(consumerDirectory, 'node_modules', 'yamdown', 'dist', 'index.d.mts'),
+    'utf8'
+  );
+  if (declarations.includes('YamlMarkdownDocument')) {
+    throw new Error('Installed declarations still expose YamlMarkdownDocument.');
+  }
+
   await runNode(
     [
       '--input-type=module',
       '--eval',
       [
-        "import { renderMarkdown, toMdast } from 'yamdown';",
+        "import { documentToMdast, parseYamlDocument, renderMarkdown, renderYamlMarkdown, toMdast } from 'yamdown';",
+        "import * as yamdown from 'yamdown';",
+        "for (const oldName of ['parseYamlMarkdown', 'YamlMarkdownError', 'YamlMarkdownParseError', 'YamlMarkdownRenderError', 'YamlMarkdownValidationError', 'yamlMarkdownDocumentSchema', 'yamlMarkdownSourceDocumentSchema']) if (oldName in yamdown) throw new Error(`Unexpected transitional export: ${oldName}`);",
         "const rendered = renderMarkdown({ blocks: [{ type: 'paragraph', children: [{ type: 'text', value: '**literal**' }] }] });",
         "if (rendered !== '\\\\*\\\\*literal\\\\*\\\\*\\n') throw new Error(`Unexpected library output: ${JSON.stringify(rendered)}`);",
         "const raw = renderMarkdown('blocks:\\n  - markdown: |\\n      **raw block**\\n');",
         "if (raw !== '**raw block**\\n') throw new Error(`Unexpected raw Markdown output: ${JSON.stringify(raw)}`);",
+        "if (renderYamlMarkdown('blocks:\\n  - p: Adapter\\n') !== 'Adapter\\n') throw new Error('Preferred YAML renderer failed');",
+        "if (parseYamlDocument('blocks: []').blocks.length !== 0) throw new Error('Preferred YAML parser failed');",
         "const gfm = renderMarkdown({ blocks: [{ type: 'list', ordered: false, items: [{ checked: true, blocks: [{ type: 'paragraph', text: 'Done' }] }] }, { type: 'table', columns: [{ key: 'name', label: 'Name', align: 'center' }], rows: [{ name: 'Yamdown' }] }, { type: 'code', lang: 'ts', meta: 'title=\"demo.ts\"', value: 'console.log(\"hello\")' }] });",
         "if (!gfm.includes('- [x] Done') || !gfm.includes('| :---: |') || !gfm.includes('```ts title=\"demo.ts\"')) throw new Error(`Unexpected GFM output: ${JSON.stringify(gfm)}`);",
         "const tree = toMdast({ blocks: [{ type: 'paragraph', text: '**semantic**' }] });",
-        "if (tree.children[0]?.type !== 'paragraph' || tree.children[0].children[0]?.type !== 'strong') throw new Error('Official mdast conversion failed');"
+        "if (tree.children[0]?.type !== 'paragraph' || tree.children[0].children[0]?.type !== 'strong') throw new Error('Official mdast conversion failed');",
+        "if (documentToMdast({ blocks: [{ type: 'paragraph', text: 'Document' }] }).children[0]?.type !== 'paragraph') throw new Error('Document mdast conversion failed');",
+        "const references = renderMarkdown({ blocks: [{ type: 'paragraph', children: [{ type: 'linkReference', identifier: 'docs', children: [{ type: 'text', value: 'Docs' }] }, { type: 'footnoteReference', identifier: 'note' }] }, { type: 'table', columns: [{ key: 'value', label: 'Value' }], rows: [{ value: { type: 'inline', children: [{ type: 'strong', children: [{ type: 'text', value: 'Rich' }] }] } }] }, { type: 'definition', identifier: 'docs', url: 'https://example.com' }, { type: 'footnoteDefinition', identifier: 'note', blocks: [{ type: 'paragraph', text: 'Note' }] }] });",
+        "if (!references.includes('[Docs][docs][^note]') || !references.includes('| **Rich** |')) throw new Error(`Unexpected reference output: ${JSON.stringify(references)}`);"
       ].join('\n')
     ],
     consumerDirectory
@@ -64,14 +79,15 @@ try {
   }
 
   const schemaPath = join(consumerDirectory, 'node_modules', 'yamdown', 'schema', 'yamdown.schema.json');
+  const schemaFile = await readFile(schemaPath, 'utf8');
   /** @type {unknown} */
-  const schema = JSON.parse(await readFile(schemaPath, 'utf8'));
+  const schema = JSON.parse(schemaFile);
   if (!isYamdownSchemaSummary(schema)) {
     throw new Error(`Unexpected packaged schema: ${JSON.stringify(schema)}`);
   }
 
   const { stdout: schemaStdout } = await runPnpm(['exec', 'yamdown', '--schema'], consumerDirectory);
-  if (JSON.stringify(JSON.parse(schemaStdout)) !== JSON.stringify(schema)) {
+  if (schemaStdout !== schemaFile) {
     throw new Error('CLI schema output did not match the packaged schema file.');
   }
 

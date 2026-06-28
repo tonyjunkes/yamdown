@@ -3,6 +3,60 @@
 All notable changes to Yamdown are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.8.0 - 2026-06-27
+
+### Added
+
+- Structured full-reference links and images with top-level definitions.
+- Structured footnote references and multi-block footnote definitions.
+- Tagged structured-inline table cells while preserving existing cell rendering.
+- Case-insensitive document-wide validation for duplicate and unresolved
+  references.
+
+### Changed
+
+- Made the `YamdownDocument`, `Yamdown*Error`, `parseYamlDocument`, and
+  `yamdown*Schema` names canonical throughout the public API and diagnostics.
+
+### Removed
+
+- Transitional `YamlMarkdownDocument`, `YamlMarkdown*Error`,
+  `parseYamlMarkdown`, and `yamlMarkdown*Schema` exports introduced before the
+  Yamdown API boundary was finalized.
+
+## 0.7.0 - 2026-06-27
+
+### Added
+
+- Preferred `parseYamlDocument`, `renderYamlMarkdown`, `documentToMdast`, and
+  `YamdownDocument` APIs.
+- Additive Yamdown-named error aliases.
+
+### Changed
+
+- Separated format-neutral document rendering and mdast conversion from the
+  explicit YAML adapter while preserving all legacy exports.
+- The CLI now calls the YAML adapter directly.
+
+## 0.6.3 - 2026-06-27
+
+### Added
+
+- Independent CLI schema-conflict tests, exact schema-output verification, and
+  expanded malformed-input and source-origin normalization coverage.
+
+## 0.6.2 - 2026-06-25
+
+### Changed
+
+- Updated pinned GitHub Actions used by CI.
+
+## 0.6.1 - 2026-06-25
+
+### Fixed
+
+- Schema generation now passes strict project typechecking.
+
 ## 0.6.0 - 2026-06-25
 
 ### Added

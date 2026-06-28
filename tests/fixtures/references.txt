@@ -1,0 +1,13 @@
+[Read the docs][docs] ![Project logo][logo][^note-1]
+
+| Value |
+| --- |
+| **Structured cell** |
+
+[docs]: https://example.com/docs "Documentation"
+
+[logo]: /logo.png
+
+[^note-1]: First paragraph.
+
+    - Nested item

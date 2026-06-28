@@ -119,6 +119,9 @@ Most common blocks also have a compact shorthand:
 | Raw HTML       | `html`          | `html`            |
 | Table          | `table`         | `table`           |
 
+Reference definitions and footnote definitions use verbose top-level nodes.
+They are intentionally unavailable inside lists and blockquotes.
+
 Lists may contain strings for simple items or nested block arrays for richer
 content. Add `checked: true` or `checked: false` to a list item when you want a
 GFM task-list marker; omit it for ordinary list items.
@@ -239,7 +242,36 @@ blocks:
 ```
 
 Supported inline nodes are `text`, `emphasis`, `strong`, `delete`, `inlineCode`,
-`link`, `image`, and `break`.
+`link`, `linkReference`, `image`, `imageReference`, `footnoteReference`, and
+`break`.
+
+Full reference links, reference images, and footnotes use machine-safe
+identifiers containing ASCII letters, digits, underscores, and hyphens.
+Identifiers are matched case-insensitively; definitions must be unique and
+every structured reference must resolve.
+
+```yaml
+blocks:
+  - type: paragraph
+    children:
+      - type: linkReference
+        identifier: docs
+        children:
+          - type: text
+            value: Read the docs
+      - type: footnoteReference
+        identifier: note-1
+  - type: definition
+    identifier: docs
+    url: https://example.com/docs
+  - type: footnoteDefinition
+    identifier: note-1
+    blocks:
+      - p: Additional context.
+```
+
+Collapsed and shortcut references remain available through trusted raw
+Markdown.
 
 > [!WARNING]
 > Raw Markdown—including paragraph and heading `text`—and `html` blocks are intentionally trusted and are not
@@ -266,38 +298,60 @@ blocks:
         description: Output format
 ```
 
+String and scalar cells retain their existing rendering. For safely structured
+inline formatting, use the tagged cell form. Existing arrays and objects remain
+JSON-stringified for compatibility.
+
+```yaml
+rows:
+  - name:
+      type: inline
+      children:
+        - type: strong
+          children:
+            - type: text
+              value: Structured cell
+```
+
 ## Library API
 
-The high-level renderer accepts either YAML source or a document object:
+The preferred YAML adapter APIs are separate from the format-neutral document
+APIs. `renderMarkdown` and `toMdast` remain as convenient polymorphic facades
+for callers that intentionally accept either YAML source or document objects:
 
 ```ts
-import { normalizeDocument, parseYamlMarkdown, renderMarkdown, toMdast } from 'yamdown';
+import { documentToMdast, normalizeDocument, parseYamlDocument, renderDocument, renderYamlMarkdown } from 'yamdown';
 
-const document = parseYamlMarkdown(`
+const source = `
 blocks:
   - h2: API example
-`);
+`;
 
+const document = parseYamlDocument(source);
 const normalized = normalizeDocument(document);
-const markdown = renderMarkdown(normalized);
-const tree = toMdast(normalized);
+const markdown = renderDocument(normalized);
+const yamlMarkdown = renderYamlMarkdown(source);
+const tree = documentToMdast(normalized);
 ```
 
 Key exports:
 
-| Export                             | Purpose                                                |
-| ---------------------------------- | ------------------------------------------------------ |
-| `parseYamlMarkdown`                | Parse YAML and return a validated normalized document  |
-| `normalizeDocument`                | Expand shorthand and validate an unknown input value   |
-| `renderMarkdown`                   | Parse or normalize input and render complete Markdown  |
-| `renderDocument`                   | Render an already validated document                   |
-| `renderBlock`, `renderInline`      | Render individual document nodes                       |
-| `toMdast`                          | Convert YAML or a document to an official `mdast.Root` |
-| `yamlMarkdownDocumentSchema`       | Validate with the public Zod document schema           |
-| `yamlMarkdownSourceDocumentSchema` | Validate the pre-normalization authoring shape         |
+| Export                        | Purpose                                                |
+| ----------------------------- | ------------------------------------------------------ |
+| `parseYamlDocument`           | Preferred YAML parser and normalizer                   |
+| `renderYamlMarkdown`          | Parse YAML and render complete Markdown                |
+| `documentToMdast`             | Convert a document object to an official `mdast.Root`  |
+| `normalizeDocument`           | Expand shorthand and validate an unknown input value   |
+| `renderMarkdown`              | Parse or normalize input and render complete Markdown  |
+| `renderDocument`              | Render an already validated document                   |
+| `renderBlock`, `renderInline` | Render individual document nodes                       |
+| `toMdast`                     | Convert YAML or a document to an official `mdast.Root` |
+| `yamdownDocumentSchema`       | Validate with the public Zod document schema           |
+| `yamdownSourceDocumentSchema` | Validate the pre-normalization authoring shape         |
 
 Public node types, schemas, source-range types, and error classes are also
-exported from the package root.
+exported from the package root. `YamdownDocument` is the canonical document
+type.
 
 ### mdast interoperability
 
@@ -379,14 +433,14 @@ YAML, issues also include one-based line and column positions plus
 zero-based character offsets; range ends are exclusive.
 
 ```text
-document.yaml:2:9 error: Invalid YAML Markdown document at blocks[0].text: Invalid input: expected string, received number
+document.yaml:2:9 error: Invalid Yamdown document at blocks[0].text: Invalid input: expected string, received number
 2 |   - h2: 42
   |         ^^
 ```
 
-Library consumers can inspect `YamlMarkdownParseError`,
-`YamlMarkdownValidationError`, `ValidationIssue`, `SourcePosition`, and
-`SourceRange` directly.
+Library consumers can inspect `YamdownYamlParseError`,
+`YamdownValidationError`, `ValidationIssue`, `SourcePosition`, and `SourceRange`
+directly.
 
 ## Development
 

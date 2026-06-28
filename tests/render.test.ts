@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { renderInline, renderMarkdown } from '../src/index.js';
+import { renderInline, renderMarkdown, renderYamlMarkdown } from '../src/index.js';
 
 const fixtureDir = join(import.meta.dirname, 'fixtures');
 
@@ -10,6 +10,10 @@ function fixture(name: string): Promise<string> {
 }
 
 describe('renderMarkdown', () => {
+  test('keeps the explicit YAML renderer and high-level facade equivalent', async () => {
+    const source = await fixture('basic.yaml');
+    expect(renderYamlMarkdown(source)).toBe(renderMarkdown(source));
+  });
   test('renders a basic fixture exactly', async () => {
     expect(renderMarkdown(await fixture('basic.yaml'))).toBe(await fixture('basic.md'));
   });
@@ -22,6 +26,10 @@ describe('renderMarkdown', () => {
 
   test('renders a raw Markdown block fixture exactly', async () => {
     expect(renderMarkdown(await fixture('raw-markdown.yaml'))).toBe(await fixture('raw-markdown.md'));
+  });
+
+  test('renders structured references, footnotes, and rich table cells exactly', async () => {
+    expect(renderYamlMarkdown(await fixture('references.yaml'))).toBe(await fixture('references.txt'));
   });
 
   test('mixes structured and raw blocks with table shorthand', async () => {
@@ -83,6 +91,73 @@ describe('renderMarkdown', () => {
         ]
       })
     ).toBe('Keep \\~\\~literal\\~\\~, remove ~~old~~.\n');
+  });
+
+  test('renders full references and multiline footnotes', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'linkReference', identifier: 'Docs', children: [{ type: 'text', value: 'Read the docs' }] },
+              { type: 'text', value: ' ' },
+              { type: 'imageReference', identifier: 'Logo', alt: 'Project logo' },
+              { type: 'footnoteReference', identifier: 'note-1' }
+            ]
+          },
+          { type: 'definition', identifier: 'docs', url: 'https://example.com/a b', title: 'Documentation' },
+          { type: 'definition', identifier: 'logo', url: '/logo.png' },
+          {
+            type: 'footnoteDefinition',
+            identifier: 'NOTE-1',
+            blocks: [
+              { type: 'paragraph', text: 'First paragraph.' },
+              { type: 'list', ordered: false, items: [{ blocks: [{ type: 'paragraph', text: 'Nested item' }] }] }
+            ]
+          }
+        ]
+      })
+    ).toBe(
+      [
+        '[Read the docs][Docs] ![Project logo][Logo][^note-1]',
+        '',
+        '[docs]: <https://example.com/a%20b> "Documentation"',
+        '',
+        '[logo]: /logo.png',
+        '',
+        '[^NOTE-1]: First paragraph.',
+        '',
+        '    - Nested item',
+        ''
+      ].join('\n')
+    );
+  });
+
+  test('renders empty definition destinations explicitly', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'paragraph',
+            children: [{ type: 'linkReference', identifier: 'docs', children: [{ type: 'text', value: 'Docs' }] }]
+          },
+          { type: 'definition', identifier: 'docs', url: '' }
+        ]
+      })
+    ).toBe('[Docs][docs]\n\n[docs]: <>\n');
+  });
+
+  test('normalizes lone carriage returns in structured titles and alt text', () => {
+    expect(
+      renderMarkdown({
+        blocks: [{ type: 'definition', identifier: 'docs', url: '/docs', title: 'Docs\r# not a heading' }]
+      })
+    ).toBe('[docs]: /docs "Docs # not a heading"\n');
+
+    expect(renderInline({ type: 'imageReference', identifier: 'logo', alt: 'Logo\r# not a heading' })).toBe(
+      '![Logo # not a heading][logo]'
+    );
   });
 
   test('escapes structured text without changing ordinary punctuation', async () => {
@@ -229,6 +304,35 @@ describe('renderMarkdown', () => {
     );
   });
 
+  test('renders tagged structured table cells without changing legacy arrays or objects', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'table',
+            columns: [
+              { key: 'rich', label: 'Rich' },
+              { key: 'array', label: 'Array' },
+              { key: 'object', label: 'Object' }
+            ],
+            rows: [
+              {
+                rich: {
+                  type: 'inline',
+                  children: [{ type: 'strong', children: [{ type: 'text', value: 'A | B' }] }]
+                },
+                array: ['a', 'b'],
+                object: { count: 2 }
+              }
+            ]
+          }
+        ]
+      })
+    ).toBe(
+      ['| Rich | Array | Object |', '| --- | --- | --- |', '| **A \\| B** | ["a","b"] | {"count":2} |', ''].join('\n')
+    );
+  });
+
   test('renders blockquotes, thematic breaks, html, and options', () => {
     const markdown = renderMarkdown(
       {
@@ -252,6 +356,11 @@ describe('renderInline', () => {
     expect(renderInline({ type: 'inlineCode', value: ' edge ' })).toBe('`  edge  `');
     expect(renderInline({ type: 'image', url: '/logo.png', alt: 'A [logo]' })).toBe('![A \\[logo\\]](/logo.png)');
     expect(renderInline({ type: 'break' })).toBe('  \n');
+    expect(
+      renderInline({ type: 'linkReference', identifier: 'docs', children: [{ type: 'text', value: 'Docs' }] })
+    ).toBe('[Docs][docs]');
+    expect(renderInline({ type: 'imageReference', identifier: 'logo', alt: 'Logo' })).toBe('![Logo][logo]');
+    expect(renderInline({ type: 'footnoteReference', identifier: 'note' })).toBe('[^note]');
   });
 
   test('protects link destinations, titles, labels, and image alt text', () => {

@@ -1,20 +1,20 @@
 import { isNode, LineCounter, parseDocument } from 'yaml';
-import { YamlMarkdownParseError } from './errors.js';
+import { YamdownYamlParseError } from './errors.js';
 import type { SourceRange } from './errors.js';
 import { normalizeDocumentWithSourceLocations } from './normalize.js';
-import type { YamlMarkdownDocument } from './types.js';
+import type { YamdownDocument } from './types.js';
 
-export function parseYamlMarkdown(input: string): YamlMarkdownDocument {
+export function parseYamlDocument(input: string): YamdownDocument {
   const lineCounter = new LineCounter();
   const document = parseDocument(input, { lineCounter, prettyErrors: false });
 
   if (document.errors.length > 0) {
     const firstError = document.errors[0];
     if (firstError === undefined) {
-      throw new YamlMarkdownParseError('Invalid YAML input.');
+      throw new YamdownYamlParseError('Invalid YAML input.');
     }
 
-    throw new YamlMarkdownParseError(
+    throw new YamdownYamlParseError(
       firstError.message,
       rangeFromOffsets(firstError.pos[0], firstError.pos[1], lineCounter)
     );

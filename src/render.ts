@@ -1,17 +1,19 @@
 import { stringify } from 'yaml';
-import { parseYamlMarkdown } from './parse.js';
 import type {
   BlockNode,
   BlockquoteNode,
   CodeNode,
+  DefinitionNode,
+  DocumentNode,
+  FootnoteDefinitionNode,
   InlineNode,
   ListNode,
   ParagraphNode,
   RenderOptions,
+  TableInlineCell,
   TableNode,
-  YamlMarkdownDocument
+  YamdownDocument
 } from './types.js';
-import { normalizeDocument } from './normalize.js';
 
 const defaultOptions = {
   blankLines: 1,
@@ -22,15 +24,7 @@ const defaultOptions = {
   orderedDelimiter: '.'
 } satisfies Required<RenderOptions>;
 
-export function renderMarkdown(
-  input: string | Readonly<YamlMarkdownDocument>,
-  options: Readonly<RenderOptions> = {}
-): string {
-  const document = typeof input === 'string' ? parseYamlMarkdown(input) : normalizeDocument(input);
-  return renderDocument(document, options);
-}
-
-export function renderDocument(document: YamlMarkdownDocument, options: RenderOptions = {}): string {
+export function renderDocument(document: YamdownDocument, options: RenderOptions = {}): string {
   const renderOptions = { ...defaultOptions, ...options };
   const parts: string[] = [];
 
@@ -44,7 +38,7 @@ export function renderDocument(document: YamlMarkdownDocument, options: RenderOp
   return `${trimTrailingLineEndings(parts.filter((part) => part.length > 0).join(separator))}\n`;
 }
 
-export function renderBlock(block: BlockNode, options: Required<RenderOptions> = defaultOptions): string {
+export function renderBlock(block: DocumentNode, options: Required<RenderOptions> = defaultOptions): string {
   switch (block.type) {
     case 'heading':
       return `${'#'.repeat(block.depth)} ${'text' in block ? block.text : renderInlineChildren(block.children, false)}`;
@@ -64,6 +58,10 @@ export function renderBlock(block: BlockNode, options: Required<RenderOptions> =
       return renderTable(block);
     case 'html':
       return block.value.trimEnd();
+    case 'definition':
+      return renderDefinition(block);
+    case 'footnoteDefinition':
+      return renderFootnoteDefinition(block, options);
   }
 
   return unreachable(block);
@@ -87,8 +85,14 @@ function renderInlineWithContext(node: InlineNode, atLineStart: boolean): string
       return renderInlineCode(node.value);
     case 'link':
       return `[${renderInlineChildren(node.children, false)}](${renderDestination(node.url)}${renderTitle(node.title)})`;
+    case 'linkReference':
+      return `[${renderInlineChildren(node.children, false)}][${node.identifier}]`;
     case 'image':
       return `![${escapeAltText(node.alt ?? '')}](${renderDestination(node.url)}${renderTitle(node.title)})`;
+    case 'imageReference':
+      return `![${escapeAltText(node.alt ?? '')}][${node.identifier}]`;
+    case 'footnoteReference':
+      return `[^${node.identifier}]`;
     case 'break':
       return '  \n';
   }
@@ -168,6 +172,23 @@ function renderBlockquote(node: BlockquoteNode, options: Required<RenderOptions>
     .join('\n');
 }
 
+function renderDefinition(node: DefinitionNode): string {
+  const destination = node.url.length === 0 ? '<>' : renderDestination(node.url);
+  return `[${node.identifier}]: ${destination}${renderTitle(node.title)}`;
+}
+
+function renderFootnoteDefinition(node: FootnoteDefinitionNode, options: Required<RenderOptions>): string {
+  const body = trimTrailingLineEndings(renderBlocks(node.blocks, options));
+  const lines = body.split('\n');
+  const rendered = [`[^${node.identifier}]: ${lines[0] ?? ''}`];
+
+  for (const line of lines.slice(1)) {
+    rendered.push(line.length > 0 ? `    ${line}` : '');
+  }
+
+  return rendered.join('\n');
+}
+
 function renderBlocks(blocks: readonly BlockNode[], options: Required<RenderOptions>): string {
   const separator = '\n'.repeat(Math.max(1, options.blankLines) + 1);
   return blocks.map((block) => renderBlock(block, options)).join(separator);
@@ -223,11 +244,18 @@ function renderInlineCode(value: string): string {
 function renderTitle(title: string | undefined): string {
   return title === undefined
     ? ''
-    : ` "${title.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll(/\r?\n/gu, ' ')}"`;
+    : ` "${title
+        .replaceAll('\\', '\\\\')
+        .replaceAll('"', '\\"')
+        .replaceAll(/\r\n?|\n/gu, ' ')}"`;
 }
 
 function escapeAltText(value: string): string {
-  return value.replaceAll('\\', '\\\\').replaceAll('[', '\\[').replaceAll(']', '\\]').replaceAll(/\r?\n/gu, ' ');
+  return value
+    .replaceAll('\\', '\\\\')
+    .replaceAll('[', '\\[')
+    .replaceAll(']', '\\]')
+    .replaceAll(/\r\n?|\n/gu, ' ');
 }
 
 function renderDestination(value: string): string {
@@ -297,6 +325,10 @@ function escapeTableCell(value: string): string {
 }
 
 function renderCellValue(value: unknown): string {
+  if (isTableInlineCell(value)) {
+    return renderInlineChildren(value.children);
+  }
+
   if (value === null || value === undefined) {
     return '';
   }
@@ -310,6 +342,18 @@ function renderCellValue(value: unknown): string {
   }
 
   return JSON.stringify(value) ?? '';
+}
+
+function isTableInlineCell(value: unknown): value is TableInlineCell {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    'type' in value &&
+    value.type === 'inline' &&
+    'children' in value &&
+    Array.isArray(value.children)
+  );
 }
 
 function escapeRegExp(value: string): string {

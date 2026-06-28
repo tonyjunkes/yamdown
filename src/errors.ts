@@ -18,12 +18,12 @@ export interface ValidationIssue {
   readonly location?: SourceRange;
 }
 
-export class YamlMarkdownError extends Error {
-  public override readonly name: string = 'YamlMarkdownError';
+export class YamdownError extends Error {
+  public override readonly name: string = 'YamdownError';
 }
 
-export class YamlMarkdownParseError extends YamlMarkdownError {
-  public override readonly name: string = 'YamlMarkdownParseError';
+export class YamdownYamlParseError extends YamdownError {
+  public override readonly name: string = 'YamdownYamlParseError';
 
   public constructor(
     message: string,
@@ -33,8 +33,8 @@ export class YamlMarkdownParseError extends YamlMarkdownError {
   }
 }
 
-export class YamlMarkdownValidationError extends YamlMarkdownError {
-  public override readonly name: string = 'YamlMarkdownValidationError';
+export class YamdownValidationError extends YamdownError {
+  public override readonly name: string = 'YamdownValidationError';
 
   public constructor(
     message: string,
@@ -44,14 +44,14 @@ export class YamlMarkdownValidationError extends YamlMarkdownError {
   }
 }
 
-export class YamlMarkdownRenderError extends YamlMarkdownError {
-  public override readonly name: string = 'YamlMarkdownRenderError';
+export class YamdownRenderError extends YamdownError {
+  public override readonly name: string = 'YamdownRenderError';
 }
 
 export function validationErrorFromZodIssues(
   issues: readonly z.core.$ZodIssue[],
   locate?: (path: readonly (string | number)[]) => SourceRange | undefined
-): YamlMarkdownValidationError {
+): YamdownValidationError {
   const normalizedIssues = issues.flatMap((issue) => normalizeZodIssue(issue, locate));
 
   const firstIssue = normalizedIssues[0];
@@ -59,7 +59,7 @@ export function validationErrorFromZodIssues(
     firstIssue?.path !== undefined && firstIssue.path.length > 0 ? ` at ${formatPath(firstIssue.path)}` : '';
   const detail = firstIssue ? `: ${firstIssue.message}` : '.';
 
-  return new YamlMarkdownValidationError(`Invalid YAML Markdown document${location}${detail}`, normalizedIssues);
+  return new YamdownValidationError(`Invalid Yamdown document${location}${detail}`, normalizedIssues);
 }
 
 function normalizeZodIssue(

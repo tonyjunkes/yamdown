@@ -5,9 +5,13 @@ import { gfmFromMarkdown } from 'mdast-util-gfm';
 import { frontmatter } from 'micromark-extension-frontmatter';
 import { gfm } from 'micromark-extension-gfm';
 import { describe, expect, test } from 'vitest';
-import { renderMarkdown, toMdast } from '../src/index.js';
+import { documentToMdast, renderMarkdown, toMdast } from '../src/index.js';
 
 describe('toMdast', () => {
+  test('keeps the document-only and high-level mdast APIs equivalent', () => {
+    const document = { blocks: [{ type: 'paragraph' as const, text: 'Hello' }] };
+    expect(documentToMdast(document)).toEqual(toMdast(document));
+  });
   test('returns an official mdast root and parses raw Markdown semantically', () => {
     const tree: Root = toMdast({
       blocks: [
@@ -178,6 +182,83 @@ describe('toMdast', () => {
       value: 'console.log("hello")'
     });
     expect(tree.children[3]).toMatchObject({ type: 'html', value: '<details>Raw HTML</details>' });
+  });
+
+  test('produces official reference, definition, footnote, and rich table cell nodes', () => {
+    const tree = toMdast({
+      blocks: [
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'linkReference', identifier: 'docs', children: [{ type: 'text', value: 'Docs' }] },
+            { type: 'imageReference', identifier: 'logo', alt: 'Logo' },
+            { type: 'footnoteReference', identifier: 'note' }
+          ]
+        },
+        {
+          type: 'table',
+          columns: [{ key: 'value', label: 'Value' }],
+          rows: [
+            {
+              value: {
+                type: 'inline',
+                children: [{ type: 'strong', children: [{ type: 'text', value: 'Structured' }] }]
+              }
+            }
+          ]
+        },
+        { type: 'definition', identifier: 'docs', url: 'https://example.com/docs' },
+        { type: 'definition', identifier: 'logo', url: '/logo.png' },
+        { type: 'footnoteDefinition', identifier: 'note', blocks: [{ type: 'paragraph', text: 'Footnote.' }] }
+      ]
+    });
+
+    expect(tree.children).toMatchObject([
+      {
+        type: 'paragraph',
+        children: [
+          { type: 'linkReference', identifier: 'docs', referenceType: 'full' },
+          { type: 'imageReference', identifier: 'logo', referenceType: 'full' },
+          { type: 'footnoteReference', identifier: 'note' }
+        ]
+      },
+      {
+        type: 'table',
+        children: [
+          { type: 'tableRow' },
+          {
+            type: 'tableRow',
+            children: [
+              { type: 'tableCell', children: [{ type: 'strong', children: [{ type: 'text', value: 'Structured' }] }] }
+            ]
+          }
+        ]
+      },
+      { type: 'definition', identifier: 'docs', url: 'https://example.com/docs' },
+      { type: 'definition', identifier: 'logo', url: '/logo.png' },
+      {
+        type: 'footnoteDefinition',
+        identifier: 'note',
+        children: [{ type: 'paragraph', children: [{ type: 'text', value: 'Footnote.' }] }]
+      }
+    ]);
+  });
+
+  test('preserves empty reference destinations as definitions', () => {
+    const tree = toMdast({
+      blocks: [
+        {
+          type: 'paragraph',
+          children: [{ type: 'linkReference', identifier: 'docs', children: [{ type: 'text', value: 'Docs' }] }]
+        },
+        { type: 'definition', identifier: 'docs', url: '' }
+      ]
+    });
+
+    expect(tree.children).toMatchObject([
+      { type: 'paragraph', children: [{ type: 'linkReference', identifier: 'docs' }] },
+      { type: 'definition', identifier: 'docs', url: '' }
+    ]);
   });
 
   test('accepts YAML source and matches parsing the rendered Markdown', () => {

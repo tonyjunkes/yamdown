@@ -2,10 +2,9 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { Command, CommanderError } from 'commander';
-import { YamlMarkdownError, YamlMarkdownParseError, YamlMarkdownValidationError } from './errors.js';
+import { YamdownError, YamdownValidationError, YamdownYamlParseError } from './errors.js';
 import type { SourceRange } from './errors.js';
-import { parseYamlMarkdown } from './parse.js';
-import { renderMarkdown } from './render.js';
+import { parseYamlDocument, renderYamlMarkdown } from './yaml.js';
 
 interface CliOptions {
   check?: boolean;
@@ -68,11 +67,11 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
       inputSource = yaml;
 
       if (options.check === true) {
-        parseYamlMarkdown(yaml);
+        parseYamlDocument(yaml);
         return;
       }
 
-      const markdown = renderMarkdown(yaml);
+      const markdown = renderYamlMarkdown(yaml);
       if (options.output !== undefined) {
         outputPath = options.output;
         await writeFile(options.output, markdown, 'utf8');
@@ -90,7 +89,7 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
       return error.exitCode;
     }
 
-    if (error instanceof YamlMarkdownError) {
+    if (error instanceof YamdownError) {
       io.stderr.write(formatCliError(error, inputPath, inputSource));
       return 1;
     }
@@ -112,11 +111,11 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
   }
 }
 
-function formatCliError(error: YamlMarkdownError, inputPath?: string, source?: string): string {
+function formatCliError(error: YamdownError, inputPath?: string, source?: string): string {
   const location =
-    error instanceof YamlMarkdownParseError
+    error instanceof YamdownYamlParseError
       ? error.location
-      : error instanceof YamlMarkdownValidationError
+      : error instanceof YamdownValidationError
         ? error.issues[0]?.location
         : undefined;
 

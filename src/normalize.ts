@@ -1,6 +1,6 @@
 import { validationErrorFromZodIssues } from './errors.js';
-import { sourceDocumentSchema, yamlMarkdownDocumentSchema } from './schema.js';
-import type { BlockNode, InlineNode, ListItemNode, YamlMarkdownDocument } from './types.js';
+import { sourceDocumentSchema, yamdownDocumentSchema } from './schema.js';
+import type { BlockNode, InlineNode, ListItemNode, YamdownDocument } from './types.js';
 import type { SourceRange } from './errors.js';
 
 type MutableRecord = Record<string, unknown>;
@@ -12,14 +12,14 @@ interface NormalizationContext {
   readonly origins: Map<string, DocumentPath>;
 }
 
-export function normalizeDocument(input: unknown): YamlMarkdownDocument {
+export function normalizeDocument(input: unknown): YamdownDocument {
   return normalizeDocumentWithSourceLocations(input);
 }
 
 export function normalizeDocumentWithSourceLocations(
   input: unknown,
   locate?: (path: DocumentPath) => SourceRange | undefined
-): YamlMarkdownDocument {
+): YamdownDocument {
   const sourceResult = sourceDocumentSchema.safeParse(input);
   if (!sourceResult.success) {
     throw validationErrorFromZodIssues(sourceResult.error.issues, locate);
@@ -27,10 +27,10 @@ export function normalizeDocumentWithSourceLocations(
 
   const context: NormalizationContext = { origins: new Map() };
   const normalized = normalizeDocumentShape(sourceResult.data, context);
-  const result = yamlMarkdownDocumentSchema.safeParse(normalized);
+  const result = yamdownDocumentSchema.safeParse(normalized);
 
   if (!result.success) {
-    throw validationErrorFromZodIssues(result.error.issues, (path) => locate?.(resolveOrigin(context, path)));
+    throw validationErrorFromZodIssues(result.error.issues, (path) => locate?.(resolveOrigin(context.origins, path)));
   }
 
   return result.data;
@@ -65,10 +65,6 @@ function normalizeBlock(
 
   const headingKey = shorthandHeadings.find((key) => Object.hasOwn(input, key));
   if (headingKey !== undefined) {
-    if (!hasOnlyKey(input, headingKey)) {
-      return input;
-    }
-
     recordOrigin(context, [...normalizedPath, 'type'], [...sourcePath, headingKey]);
     recordOrigin(context, [...normalizedPath, 'depth'], [...sourcePath, headingKey]);
     recordOrigin(context, [...normalizedPath, 'text'], [...sourcePath, headingKey]);
@@ -80,10 +76,6 @@ function normalizeBlock(
   }
 
   if (Object.hasOwn(input, 'p')) {
-    if (!hasOnlyKey(input, 'p')) {
-      return input;
-    }
-
     recordOrigin(context, [...normalizedPath, 'type'], [...sourcePath, 'p']);
     recordOrigin(context, [...normalizedPath, 'text'], [...sourcePath, 'p']);
     return {
@@ -93,10 +85,6 @@ function normalizeBlock(
   }
 
   if (Object.hasOwn(input, 'markdown')) {
-    if (!hasOnlyKey(input, 'markdown')) {
-      return input;
-    }
-
     recordOrigin(context, [...normalizedPath, 'type'], [...sourcePath, 'markdown']);
     recordOrigin(context, [...normalizedPath, 'value'], [...sourcePath, 'markdown']);
     return {
@@ -106,10 +94,6 @@ function normalizeBlock(
   }
 
   if (Object.hasOwn(input, 'ul')) {
-    if (!hasOnlyKey(input, 'ul')) {
-      return input;
-    }
-
     recordOrigin(context, [...normalizedPath, 'items'], [...sourcePath, 'ul']);
     return {
       type: 'list',
@@ -119,10 +103,6 @@ function normalizeBlock(
   }
 
   if (Object.hasOwn(input, 'ol')) {
-    if (!hasOnlyKey(input, 'ol')) {
-      return input;
-    }
-
     recordOrigin(context, [...normalizedPath, 'items'], [...sourcePath, 'ol']);
     return {
       type: 'list',
@@ -132,18 +112,10 @@ function normalizeBlock(
   }
 
   if (Object.hasOwn(input, 'code')) {
-    if (!hasOnlyKey(input, 'code')) {
-      return input;
-    }
-
     return normalizeCodeShorthand(input.code, context, normalizedPath, [...sourcePath, 'code']);
   }
 
   if (Object.hasOwn(input, 'quote')) {
-    if (!hasOnlyKey(input, 'quote')) {
-      return input;
-    }
-
     recordOrigin(context, [...normalizedPath, 'blocks'], [...sourcePath, 'quote']);
     return {
       type: 'blockquote',
@@ -156,20 +128,12 @@ function normalizeBlock(
   }
 
   if (Object.hasOwn(input, 'hr')) {
-    if (!hasOnlyKey(input, 'hr')) {
-      return input;
-    }
-
     return {
       type: 'thematicBreak'
     };
   }
 
   if (Object.hasOwn(input, 'html')) {
-    if (!hasOnlyKey(input, 'html')) {
-      return input;
-    }
-
     recordOrigin(context, [...normalizedPath, 'type'], [...sourcePath, 'html']);
     recordOrigin(context, [...normalizedPath, 'value'], [...sourcePath, 'html']);
     return {
@@ -179,10 +143,6 @@ function normalizeBlock(
   }
 
   if (Object.hasOwn(input, 'table')) {
-    if (!hasOnlyKey(input, 'table')) {
-      return input;
-    }
-
     recordOrigin(context, [...normalizedPath, 'type'], [...sourcePath, 'table']);
     recordOrigin(context, [...normalizedPath, 'columns'], [...sourcePath, 'table', 'columns']);
     recordOrigin(context, [...normalizedPath, 'rows'], [...sourcePath, 'table', 'rows']);
@@ -230,6 +190,20 @@ function normalizeVerboseBlock(
               normalizeBlock(block, context, [...normalizedPath, 'blocks', index], [...sourcePath, 'blocks', index])
             )
           : input.blocks
+      };
+    case 'footnoteDefinition':
+      return {
+        ...input,
+        blocks: Array.isArray(input.blocks)
+          ? input.blocks.map((block, index) =>
+              normalizeBlock(block, context, [...normalizedPath, 'blocks', index], [...sourcePath, 'blocks', index])
+            )
+          : input.blocks
+      };
+    case 'table':
+      return {
+        ...input,
+        rows: normalizeTableRows(input.rows)
       };
     default:
       return input;
@@ -328,23 +302,41 @@ function normalizeInline(input: unknown): unknown {
   return input;
 }
 
-function isRecord(input: unknown): input is MutableRecord {
-  return typeof input === 'object' && input !== null && !Array.isArray(input);
+function normalizeTableRows(input: unknown): unknown {
+  if (!Array.isArray(input)) {
+    return input;
+  }
+
+  const rows: readonly unknown[] = input;
+  return rows.map((row) => {
+    if (!isRecord(row)) {
+      return row;
+    }
+
+    return Object.fromEntries(
+      Object.entries(row).map(([key, value]) => {
+        if (isRecord(value) && value.type === 'inline' && Array.isArray(value.children)) {
+          return [key, { ...value, children: value.children.map((child) => normalizeInline(child)) }];
+        }
+
+        return [key, value];
+      })
+    );
+  });
 }
 
-function hasOnlyKey(input: MutableRecord, key: string): boolean {
-  const keys = Object.keys(input);
-  return keys.length === 1 && keys[0] === key;
+function isRecord(input: unknown): input is MutableRecord {
+  return typeof input === 'object' && input !== null && !Array.isArray(input);
 }
 
 function recordOrigin(context: NormalizationContext, normalizedPath: DocumentPath, sourcePath: DocumentPath): void {
   context.origins.set(JSON.stringify(normalizedPath), sourcePath);
 }
 
-function resolveOrigin(context: NormalizationContext, path: DocumentPath): DocumentPath {
+export function resolveOrigin(origins: ReadonlyMap<string, DocumentPath>, path: DocumentPath): DocumentPath {
   for (let length = path.length; length >= 0; length -= 1) {
     const candidate = path.slice(0, length);
-    const origin = context.origins.get(JSON.stringify(candidate));
+    const origin = origins.get(JSON.stringify(candidate));
     if (origin !== undefined) {
       return [...origin, ...path.slice(length)];
     }

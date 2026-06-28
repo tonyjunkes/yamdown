@@ -8,21 +8,21 @@ const jsonSchemaModulePath = ['..', 'dist', 'json-schema.mjs'].join('/');
 const jsonSchemaModule = await import(jsonSchemaModulePath);
 
 if (!isJsonSchemaModule(jsonSchemaModule)) {
-  throw new TypeError('Expected the built JSON Schema module to export stringifyYamlMarkdownJsonSchema.');
+  throw new TypeError('Expected the built JSON Schema module to export stringifyYamdownJsonSchema.');
 }
 
 await mkdir(dirname(schemaPath), { recursive: true });
-await writeFile(schemaPath, jsonSchemaModule.stringifyYamlMarkdownJsonSchema(), 'utf8');
+await writeFile(schemaPath, jsonSchemaModule.stringifyYamdownJsonSchema(), 'utf8');
 
 /**
  * @param {unknown} value imported module namespace
- * @returns {value is { stringifyYamlMarkdownJsonSchema: () => string }} true when the module has the expected export
+ * @returns {value is { stringifyYamdownJsonSchema: () => string }} true when the module has the expected export
  */
 function isJsonSchemaModule(value) {
   return (
     typeof value === 'object' &&
     value !== null &&
-    'stringifyYamlMarkdownJsonSchema' in value &&
-    typeof value.stringifyYamlMarkdownJsonSchema === 'function'
+    'stringifyYamdownJsonSchema' in value &&
+    typeof value.stringifyYamdownJsonSchema === 'function'
   );
 }

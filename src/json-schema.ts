@@ -12,7 +12,7 @@ const schemaMetadata = {
   description: 'YAML authoring schema for Yamdown documents before normalization.'
 } satisfies JsonObject;
 
-export function createYamlMarkdownJsonSchema(): JsonObject {
+export function createYamdownJsonSchema(): JsonObject {
   const generatedSchema = z.toJSONSchema(sourceDocumentSchema, {
     target: 'draft-2020-12'
   });
@@ -25,12 +25,56 @@ export function createYamlMarkdownJsonSchema(): JsonObject {
 
   Object.assign(schema, schemaMetadata);
   applyCodeMetadataConstraints(schema);
+  applyInlineTableCellConstraints(schema);
 
   return schema;
 }
 
-export function stringifyYamlMarkdownJsonSchema(): string {
-  return `${JSON.stringify(createYamlMarkdownJsonSchema(), null, 2)}\n`;
+function applyInlineTableCellConstraints(value: JsonValue): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      applyInlineTableCellConstraints(item);
+    }
+    return;
+  }
+
+  if (!isJsonObject(value)) {
+    return;
+  }
+
+  if (Array.isArray(value.anyOf) && value.anyOf.some(isInlineTableCellSchema)) {
+    value.anyOf = value.anyOf.map((option) =>
+      isEmptyJsonSchema(option)
+        ? {
+            not: {
+              type: 'object',
+              required: ['type'],
+              properties: { type: { const: 'inline' } }
+            }
+          }
+        : option
+    );
+  }
+
+  for (const item of Object.values(value)) {
+    applyInlineTableCellConstraints(item);
+  }
+}
+
+function isInlineTableCellSchema(value: JsonValue): boolean {
+  if (!isJsonObject(value) || !isJsonObject(value.properties)) {
+    return false;
+  }
+
+  return hasStringConst(value.properties.type, 'inline') && isJsonObject(value.properties.children);
+}
+
+function isEmptyJsonSchema(value: JsonValue): boolean {
+  return isJsonObject(value) && Object.keys(value).length === 0;
+}
+
+export function stringifyYamdownJsonSchema(): string {
+  return `${JSON.stringify(createYamdownJsonSchema(), null, 2)}\n`;
 }
 
 function applyCodeMetadataConstraints(value: JsonValue): void {

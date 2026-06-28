@@ -1,0 +1,40 @@
+blocks:
+  - type: paragraph
+    children:
+      - type: linkReference
+        identifier: docs
+        children:
+          - type: text
+            value: Read the docs
+      - type: text
+        value: ' '
+      - type: imageReference
+        identifier: logo
+        alt: Project logo
+      - type: footnoteReference
+        identifier: note-1
+  - table:
+      columns:
+        - key: value
+          label: Value
+      rows:
+        - value:
+            type: inline
+            children:
+              - type: strong
+                children:
+                  - type: text
+                    value: Structured cell
+  - type: definition
+    identifier: docs
+    url: https://example.com/docs
+    title: Documentation
+  - type: definition
+    identifier: logo
+    url: /logo.png
+  - type: footnoteDefinition
+    identifier: note-1
+    blocks:
+      - p: First paragraph.
+      - ul:
+          - Nested item

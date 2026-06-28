@@ -1,36 +1,46 @@
 export {
-  YamlMarkdownError,
-  YamlMarkdownParseError,
-  YamlMarkdownRenderError,
-  YamlMarkdownValidationError,
+  YamdownError,
+  YamdownRenderError,
+  YamdownValidationError,
+  YamdownYamlParseError,
   type SourcePosition,
   type SourceRange,
   type ValidationIssue
 } from './errors.js';
+export { documentToMdast } from './document-mdast.js';
 export { toMdast } from './mdast.js';
 export { normalizeDocument } from './normalize.js';
-export { parseYamlMarkdown } from './parse.js';
-export { renderBlock, renderDocument, renderInline, renderMarkdown } from './render.js';
+export { renderMarkdown } from './facade.js';
+export { renderBlock, renderDocument, renderInline } from './render.js';
+export { parseYamlDocument, renderYamlMarkdown } from './yaml.js';
 export {
   blockNodeSchema,
+  documentNodeSchema,
   inlineNodeSchema,
   listItemSchema,
-  sourceDocumentSchema as yamlMarkdownSourceDocumentSchema,
-  yamlMarkdownDocumentSchema
+  sourceDocumentSchema as yamdownSourceDocumentSchema,
+  tableInlineCellSchema,
+  yamdownDocumentSchema
 } from './schema.js';
 export type {
   BlockNode,
   BlockquoteNode,
   BreakInline,
   CodeNode,
+  DefinitionNode,
   DeleteInline,
+  DocumentNode,
   EmphasisInline,
+  FootnoteDefinitionNode,
+  FootnoteReferenceInline,
   HeadingNode,
   HtmlNode,
   ImageInline,
+  ImageReferenceInline,
   InlineCodeInline,
   InlineNode,
   LinkInline,
+  LinkReferenceInline,
   ListItemNode,
   ListNode,
   MarkdownNode,
@@ -39,8 +49,9 @@ export type {
   StrongInline,
   TableAlignment,
   TableColumn,
+  TableInlineCell,
   TableNode,
   TextInline,
   ThematicBreakNode,
-  YamlMarkdownDocument
+  YamdownDocument
 } from './types.js';
