@@ -3,6 +3,13 @@
 All notable changes to Yamdown are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.8.1 - 2026-07-11
+
+### Changed
+
+- Bumped dependencies to their latest versions.
+- Verified release of TypeScript 7 compatibility.
+
 ## 0.8.0 - 2026-06-27
 
 ### Added
