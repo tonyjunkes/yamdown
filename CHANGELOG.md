@@ -3,6 +3,28 @@
 All notable changes to Yamdown are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.9.0 - 2026-07-15
+
+### Changed
+
+- Tables now require at least one column in runtime validation and the packaged
+  JSON Schema, preventing table nodes from degrading into paragraphs in mdast.
+- Simplified normalization and shared block schemas while reducing allocations
+  in inline rendering and code-fence detection.
+- Updated the development toolchain and aligned the Vitest and V8 coverage
+  package versions.
+
+### Fixed
+
+- Normalized lone carriage returns in table labels and cells.
+- Quoted arbitrary object keys in validation paths to keep diagnostics
+  unambiguous.
+
+### Tests
+
+- Added regression coverage for zero-column tables, every table-cell line-ending
+  form, and diagnostic paths containing punctuation or whitespace.
+
 ## 0.8.1 - 2026-07-11
 
 ### Changed

@@ -117,6 +117,8 @@ describe('Yamdown authoring JSON Schema', () => {
       'invalid table alignment',
       { blocks: [{ table: { columns: [{ key: 'name', label: 'Name', align: 'justify' }], rows: [] } }] }
     ],
+    ['zero-column shorthand table', { blocks: [{ table: { columns: [], rows: [] } }] }],
+    ['zero-column verbose table', { blocks: [{ type: 'table', columns: [], rows: [] }] }],
     ['invalid inline node', { blocks: [{ type: 'paragraph', children: [{ text: 'Missing type' }] }] }],
     ['invalid thematic break shorthand', { blocks: [{ hr: false }] }],
     ['invalid task-list state', { blocks: [{ ul: [{ checked: 'yes', blocks: [] }] }] }],

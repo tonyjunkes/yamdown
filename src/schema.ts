@@ -137,6 +137,12 @@ const legacyTableCellValueSchema = z.unknown().superRefine((value, context) => {
 
 const tableCellValueSchema = z.union([tableInlineCellSchema, legacyTableCellValueSchema]);
 const tableRowsSchema = z.array(z.record(z.string(), tableCellValueSchema));
+const tableBodySchema = z
+  .object({
+    columns: z.array(tableColumnSchema).min(1, 'Tables must define at least one column'),
+    rows: tableRowsSchema
+  })
+  .strict();
 
 const paragraphSchema: z.ZodType<ParagraphNode> = z.union([
   z
@@ -177,6 +183,21 @@ const headingSchema = z.union([
     .strict()
 ]);
 
+const thematicBreakSchema = z
+  .object({
+    type: z.literal('thematicBreak')
+  })
+  .strict();
+
+const tableSchema = tableBodySchema.extend({ type: z.literal('table') }).strict();
+
+const htmlSchema = z
+  .object({
+    type: z.literal('html'),
+    value: z.string()
+  })
+  .strict();
+
 export const listItemSchema: z.ZodType<ListItemNode> = z.lazy(() =>
   z
     .object({
@@ -206,24 +227,9 @@ export const blockNodeSchema: z.ZodType<BlockNode> = z.lazy(() =>
         blocks: z.array(blockNodeSchema)
       })
       .strict(),
-    z
-      .object({
-        type: z.literal('thematicBreak')
-      })
-      .strict(),
-    z
-      .object({
-        type: z.literal('table'),
-        columns: z.array(tableColumnSchema),
-        rows: tableRowsSchema
-      })
-      .strict(),
-    z
-      .object({
-        type: z.literal('html'),
-        value: z.string()
-      })
-      .strict()
+    thematicBreakSchema,
+    tableSchema,
+    htmlSchema
   ])
 );
 
@@ -255,13 +261,6 @@ export const yamdownDocumentSchema: z.ZodType<YamdownDocument> = z
   })
   .strict()
   .superRefine(addReferenceIntegrityIssues);
-
-const tableBodySchema = z
-  .object({
-    columns: z.array(tableColumnSchema),
-    rows: tableRowsSchema
-  })
-  .strict();
 
 const sourceListItemSchema: z.ZodType = z.lazy(() =>
   z.union([
@@ -296,18 +295,9 @@ const sourceBlockNodeSchema: z.ZodType = z.lazy(() =>
         blocks: z.array(sourceBlockNodeSchema)
       })
       .strict(),
-    z
-      .object({
-        type: z.literal('thematicBreak')
-      })
-      .strict(),
-    tableBodySchema.extend({ type: z.literal('table') }).strict(),
-    z
-      .object({
-        type: z.literal('html'),
-        value: z.string()
-      })
-      .strict(),
+    thematicBreakSchema,
+    tableSchema,
+    htmlSchema,
     ...shorthandHeadings.map((key) => z.object({ [key]: z.string() }).strict()),
     z.object({ p: z.string() }).strict(),
     z.object({ markdown: z.string() }).strict(),

@@ -281,7 +281,8 @@ Markdown.
 
 ### Tables
 
-Table columns define the output order independently of object key order.
+Tables require at least one column. Columns define the output order independently
+of object key order.
 
 ```yaml
 blocks:

@@ -115,15 +115,15 @@ function renderRawMarkdown(value: string): string {
 
 function renderInlineChildren(children: readonly InlineNode[], initialAtLineStart = true): string {
   let atLineStart = initialAtLineStart;
-  let output = '';
+  const output: string[] = [];
 
   for (const child of children) {
     const rendered = renderInlineWithContext(child, atLineStart);
-    output += rendered;
+    output.push(rendered);
     atLineStart = rendered.endsWith('\n');
   }
 
-  return output;
+  return output.join('');
 }
 
 function renderList(node: ListNode, options: Required<RenderOptions>): string {
@@ -225,16 +225,11 @@ function renderFrontmatter(frontmatter: Record<string, unknown>): string {
 }
 
 function createFence(value: string, fenceCharacter: '`' | '~'): string {
-  const escaped = escapeRegExp(fenceCharacter);
-  const runs = value.match(new RegExp(`${escaped}{3,}`, 'gu')) ?? [];
-  const longestRun = runs.reduce((longest, run) => Math.max(longest, run.length), 2);
-  return fenceCharacter.repeat(longestRun + 1);
+  return fenceCharacter.repeat(Math.max(3, longestCharacterRun(value, fenceCharacter) + 1));
 }
 
 function renderInlineCode(value: string): string {
-  const runs = value.match(/`+/gu) ?? [];
-  const longestRun = runs.reduce((longest, run) => Math.max(longest, run.length), 0);
-  const fence = '`'.repeat(longestRun + 1);
+  const fence = '`'.repeat(longestCharacterRun(value, '`') + 1);
   const needsPadding = value.length > 0 && !/^ +$/u.test(value) && (/^[ `]/u.test(value) || /[ `]$/u.test(value));
   const paddedValue = needsPadding ? ` ${value} ` : value;
 
@@ -321,7 +316,7 @@ function escapeBlockMarker(line: string): string {
 }
 
 function escapeTableCell(value: string): string {
-  return value.replaceAll('|', '\\|').replaceAll(/\r?\n/gu, ' ');
+  return value.replaceAll('|', '\\|').replaceAll(/\r\n?|\n/gu, ' ');
 }
 
 function renderCellValue(value: unknown): string {
@@ -356,8 +351,20 @@ function isTableInlineCell(value: unknown): value is TableInlineCell {
   );
 }
 
-function escapeRegExp(value: string): string {
-  return value.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+function longestCharacterRun(value: string, character: string): number {
+  let longest = 0;
+  let current = 0;
+
+  for (const candidate of value) {
+    if (candidate === character) {
+      current += 1;
+      longest = Math.max(longest, current);
+    } else {
+      current = 0;
+    }
+  }
+
+  return longest;
 }
 
 function trimTrailingLineEndings(value: string): string {

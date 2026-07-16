@@ -114,7 +114,11 @@ export function formatPath(path: readonly (string | number)[]): string {
         return `[${part}]`;
       }
 
-      return index === 0 ? part : `.${part}`;
+      if (/^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(part)) {
+        return index === 0 ? part : `.${part}`;
+      }
+
+      return `[${JSON.stringify(part)}]`;
     })
     .join('');
 }

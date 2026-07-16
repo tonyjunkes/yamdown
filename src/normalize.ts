@@ -1,6 +1,6 @@
 import { validationErrorFromZodIssues } from './errors.js';
 import { sourceDocumentSchema, yamdownDocumentSchema } from './schema.js';
-import type { BlockNode, InlineNode, ListItemNode, YamdownDocument } from './types.js';
+import type { BlockNode, ListItemNode, YamdownDocument } from './types.js';
 import type { SourceRange } from './errors.js';
 
 type MutableRecord = Record<string, unknown>;
@@ -168,15 +168,6 @@ function normalizeVerboseBlock(
   sourcePath: DocumentPath
 ): unknown {
   switch (input.type) {
-    case 'heading':
-    case 'paragraph':
-      if (Array.isArray(input.children)) {
-        return {
-          ...input,
-          children: input.children.map((child) => normalizeInline(child))
-        };
-      }
-      return input;
     case 'list':
       return {
         ...input,
@@ -199,11 +190,6 @@ function normalizeVerboseBlock(
               normalizeBlock(block, context, [...normalizedPath, 'blocks', index], [...sourcePath, 'blocks', index])
             )
           : input.blocks
-      };
-    case 'table':
-      return {
-        ...input,
-        rows: normalizeTableRows(input.rows)
       };
     default:
       return input;
@@ -285,44 +271,6 @@ function normalizeListItem(
   }
 
   return item;
-}
-
-function normalizeInline(input: unknown): unknown {
-  if (!isRecord(input)) {
-    return input;
-  }
-
-  if (Array.isArray(input.children)) {
-    return {
-      ...input,
-      children: input.children.map((child) => normalizeInline(child))
-    } satisfies InlineNode | MutableRecord;
-  }
-
-  return input;
-}
-
-function normalizeTableRows(input: unknown): unknown {
-  if (!Array.isArray(input)) {
-    return input;
-  }
-
-  const rows: readonly unknown[] = input;
-  return rows.map((row) => {
-    if (!isRecord(row)) {
-      return row;
-    }
-
-    return Object.fromEntries(
-      Object.entries(row).map(([key, value]) => {
-        if (isRecord(value) && value.type === 'inline' && Array.isArray(value.children)) {
-          return [key, { ...value, children: value.children.map((child) => normalizeInline(child)) }];
-        }
-
-        return [key, value];
-      })
-    );
-  });
 }
 
 function isRecord(input: unknown): input is MutableRecord {

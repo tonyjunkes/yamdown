@@ -256,6 +256,20 @@ describe('renderMarkdown', () => {
     );
   });
 
+  test('normalizes every line-ending form in table labels and cells', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'table',
+            columns: [{ key: 'value', label: 'First\rSecond' }],
+            rows: [{ value: 'A\rB\r\nC\nD' }]
+          }
+        ]
+      })
+    ).toBe(['| First Second |', '| --- |', '| A B C D |', ''].join('\n'));
+  });
+
   test('renders table column alignment', () => {
     expect(
       renderMarkdown({
