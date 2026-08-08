@@ -1,6 +1,6 @@
 // @ts-check
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { promisify } from 'node:util';
@@ -35,6 +35,16 @@ try {
   );
 
   await runPnpm(['add', '--ignore-scripts', tarball], consumerDirectory);
+
+  const installedPackageDirectory = join(consumerDirectory, 'node_modules', 'yamdown');
+  const expectedPackageEntries = [
+    'dist/index.mjs',
+    'dist/cli.mjs',
+    'schema/yamdown.schema.json',
+    'README.md',
+    'FORMAT.md'
+  ];
+  await Promise.all(expectedPackageEntries.map((entry) => access(join(installedPackageDirectory, entry))));
 
   await writeFile(
     join(consumerDirectory, 'tsconfig.json'),
@@ -78,15 +88,12 @@ try {
   );
   await runTypeScriptCheck(consumerDirectory);
 
-  const declarations = await readFile(
-    join(consumerDirectory, 'node_modules', 'yamdown', 'dist', 'index.d.mts'),
-    'utf8'
-  );
+  const declarations = await readFile(join(installedPackageDirectory, 'dist', 'index.d.mts'), 'utf8');
   if (declarations.includes('YamlMarkdownDocument')) {
     throw new Error('Installed declarations still expose YamlMarkdownDocument.');
   }
 
-  const formatSpecification = await readFile(join(consumerDirectory, 'node_modules', 'yamdown', 'FORMAT.md'), 'utf8');
+  const formatSpecification = await readFile(join(installedPackageDirectory, 'FORMAT.md'), 'utf8');
   if (!formatSpecification.includes('Yamdown Markdown format')) {
     throw new Error('Installed package is missing the Yamdown Markdown format specification.');
   }
@@ -144,9 +151,7 @@ try {
   }
 
   /** @type {unknown} */
-  const packageManifest = JSON.parse(
-    await readFile(join(consumerDirectory, 'node_modules', 'yamdown', 'package.json'), 'utf8')
-  );
+  const packageManifest = JSON.parse(await readFile(join(installedPackageDirectory, 'package.json'), 'utf8'));
   if (!isPackageManifest(packageManifest)) {
     throw new TypeError('Installed package manifest has no version.');
   }
@@ -155,7 +160,7 @@ try {
     throw new Error(`Unexpected CLI version: ${JSON.stringify(versionStdout)}`);
   }
 
-  const schemaPath = join(consumerDirectory, 'node_modules', 'yamdown', 'schema', 'yamdown.schema.json');
+  const schemaPath = join(installedPackageDirectory, 'schema', 'yamdown.schema.json');
   const schemaFile = await readFile(schemaPath, 'utf8');
   /** @type {unknown} */
   const schema = JSON.parse(schemaFile);
