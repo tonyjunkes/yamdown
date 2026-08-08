@@ -36,6 +36,48 @@ try {
 
   await runPnpm(['add', '--ignore-scripts', tarball], consumerDirectory);
 
+  await writeFile(
+    join(consumerDirectory, 'tsconfig.json'),
+    `${JSON.stringify(
+      {
+        compilerOptions: {
+          module: 'NodeNext',
+          moduleResolution: 'NodeNext',
+          noEmit: true,
+          strict: true,
+          target: 'ES2022',
+          verbatimModuleSyntax: true
+        }
+      },
+      null,
+      2
+    )}\n`,
+    'utf8'
+  );
+  await writeFile(
+    join(consumerDirectory, 'consumer.ts'),
+    [
+      'import {',
+      '  parseMarkdownDocument,',
+      '  parseYamlDocument,',
+      '  renderMarkdownDocument,',
+      '  serializeMarkdownDocument,',
+      '  type YamdownMarkdownDocument',
+      "} from 'yamdown';",
+      '',
+      "const markdownDocument: YamdownMarkdownDocument = parseMarkdownDocument('# Type consumer\\n');",
+      'const cleanMarkdown: string = renderMarkdownDocument(markdownDocument);',
+      'const annotatedMarkdown: string = serializeMarkdownDocument(markdownDocument);',
+      'const yamlDocument = parseYamlDocument("blocks:\\n  - h1: YAML consumer\\n");',
+      'const annotationCount: number = markdownDocument.annotations.length;',
+      'const rootType: string = markdownDocument.root.type;',
+      'void [cleanMarkdown, annotatedMarkdown, yamlDocument, annotationCount, rootType];',
+      ''
+    ].join('\n'),
+    'utf8'
+  );
+  await runTypeScriptCheck(consumerDirectory);
+
   const declarations = await readFile(
     join(consumerDirectory, 'node_modules', 'yamdown', 'dist', 'index.d.mts'),
     'utf8'
@@ -44,12 +86,17 @@ try {
     throw new Error('Installed declarations still expose YamlMarkdownDocument.');
   }
 
+  const formatSpecification = await readFile(join(consumerDirectory, 'node_modules', 'yamdown', 'FORMAT.md'), 'utf8');
+  if (!formatSpecification.includes('Yamdown Markdown format')) {
+    throw new Error('Installed package is missing the Yamdown Markdown format specification.');
+  }
+
   await runNode(
     [
       '--input-type=module',
       '--eval',
       [
-        "import { documentToMdast, parseYamlDocument, renderMarkdown, renderYamlMarkdown, toMdast } from 'yamdown';",
+        "import { documentToMdast, parseMarkdownDocument, parseYamlDocument, renderMarkdown, renderMarkdownDocument, renderYamlMarkdown, serializeMarkdownDocument, toMdast } from 'yamdown';",
         "import * as yamdown from 'yamdown';",
         "for (const oldName of ['parseYamlMarkdown', 'YamlMarkdownError', 'YamlMarkdownParseError', 'YamlMarkdownRenderError', 'YamlMarkdownValidationError', 'yamlMarkdownDocumentSchema', 'yamlMarkdownSourceDocumentSchema']) if (oldName in yamdown) throw new Error(`Unexpected transitional export: ${oldName}`);",
         "const rendered = renderMarkdown({ blocks: [{ type: 'paragraph', children: [{ type: 'text', value: '**literal**' }] }] });",
@@ -58,6 +105,12 @@ try {
         "if (raw !== '**raw block**\\n') throw new Error(`Unexpected raw Markdown output: ${JSON.stringify(raw)}`);",
         "if (renderYamlMarkdown('blocks:\\n  - p: Adapter\\n') !== 'Adapter\\n') throw new Error('Preferred YAML renderer failed');",
         "if (parseYamlDocument('blocks: []').blocks.length !== 0) throw new Error('Preferred YAML parser failed');",
+        'const markdownDocument = parseMarkdownDocument(\'<!-- yamdown:document {"v":1,"profile":"base"} -->\\n<!-- yamdown:node {"id":"title"} -->\\n# Installed Markdown\\n\');',
+        "if (markdownDocument.root.children[0]?.type !== 'html' || markdownDocument.annotations.length !== 1) throw new Error('Markdown document parser failed');",
+        "if (renderMarkdownDocument(markdownDocument) !== '# Installed Markdown\\n') throw new Error('Markdown clean renderer failed');",
+        "if (!serializeMarkdownDocument(markdownDocument).includes('yamdown:node')) throw new Error('Markdown serializer failed');",
+        'const frontmatterMarkdownDocument = parseMarkdownDocument(\'---\\ntitle: Installed\\n---\\n<!-- yamdown:document {"v":1,"profile":"base"} -->\\n# Frontmatter Markdown\\n\');',
+        "if (frontmatterMarkdownDocument.root.children[0]?.type !== 'yaml') throw new Error('Markdown document frontmatter parser failed');",
         "const gfm = renderMarkdown({ blocks: [{ type: 'list', ordered: false, items: [{ checked: true, blocks: [{ type: 'paragraph', text: 'Done' }] }] }, { type: 'table', columns: [{ key: 'name', label: 'Name', align: 'center' }], rows: [{ name: 'Yamdown' }] }, { type: 'code', lang: 'ts', meta: 'title=\"demo.ts\"', value: 'console.log(\"hello\")' }] });",
         "if (!gfm.includes('- [x] Done') || !gfm.includes('| :---: |') || !gfm.includes('```ts title=\"demo.ts\"')) throw new Error(`Unexpected GFM output: ${JSON.stringify(gfm)}`);",
         "const tree = toMdast({ blocks: [{ type: 'paragraph', text: '**semantic**' }] });",
@@ -76,6 +129,30 @@ try {
 
   if (stdout !== '# Installed\n') {
     throw new Error(`Unexpected CLI output: ${JSON.stringify(stdout)}`);
+  }
+
+  const markdownInputPath = join(consumerDirectory, 'input.yamdown.md');
+  await writeFile(
+    markdownInputPath,
+    '<!-- yamdown:document {"v":1,"profile":"base"} -->\n<!-- yamdown:node {"id":"title"} -->\n# Installed Markdown\n',
+    'utf8'
+  );
+  const { stdout: markdownStdout } = await runPnpm(['exec', 'yamdown', markdownInputPath], consumerDirectory);
+
+  if (markdownStdout !== '# Installed Markdown\n') {
+    throw new Error(`Unexpected Markdown CLI output: ${JSON.stringify(markdownStdout)}`);
+  }
+
+  /** @type {unknown} */
+  const packageManifest = JSON.parse(
+    await readFile(join(consumerDirectory, 'node_modules', 'yamdown', 'package.json'), 'utf8')
+  );
+  if (!isPackageManifest(packageManifest)) {
+    throw new TypeError('Installed package manifest has no version.');
+  }
+  const { stdout: versionStdout } = await runPnpm(['exec', 'yamdown', '--version'], consumerDirectory);
+  if (versionStdout !== `${packageManifest.version}\n`) {
+    throw new Error(`Unexpected CLI version: ${JSON.stringify(versionStdout)}`);
   }
 
   const schemaPath = join(consumerDirectory, 'node_modules', 'yamdown', 'schema', 'yamdown.schema.json');
@@ -130,6 +207,24 @@ function runNode(arguments_, cwd) {
     env: process.env,
     maxBuffer: 10 * 1024 * 1024
   });
+}
+
+/**
+ * Compile a consumer through the workspace TypeScript executable. The program
+ * and declarations it resolves are installed from the tarball in `cwd`.
+ *
+ * @param {string} cwd consumer directory
+ */
+function runTypeScriptCheck(cwd) {
+  return runNode([join(root, 'node_modules', 'typescript', 'bin', 'tsc'), '--project', 'tsconfig.json'], cwd);
+}
+
+/**
+ * @param {unknown} value parsed package manifest
+ * @returns {value is { version: string }} true when the package manifest has a version
+ */
+function isPackageManifest(value) {
+  return typeof value === 'object' && value !== null && 'version' in value && typeof value.version === 'string';
 }
 
 /**

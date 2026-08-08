@@ -4,17 +4,12 @@ env:
   NODE_VERSION: 24
 
 # Run on pushes to the default branch and on pull requests targeting it.
-# Also allow manual dispatches for ad-hoc runs.
+# Documentation is intentionally included: the README example is executable.
 on:
   push:
     branches: [main]
-    paths-ignore: &ignored_paths
-      - "**/*.md"
-      - "docs/**"
-      - "LICENSE"
   pull_request:
     branches: [main]
-    paths-ignore: *ignored_paths
   workflow_dispatch:
 
 # Least-privilege: the workflow only needs to read repository contents.
@@ -72,7 +67,29 @@ jobs:
         run: pnpm run typecheck
 
   test:
-    name: Test
+    name: Test (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['22.12.0', '24']
+    steps:
+      - *checkout_step
+      - *setup_pnpm_step
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+
+      - *install_dependencies_step
+
+      - name: Run tests
+        run: pnpm run test
+
+  coverage:
+    name: Coverage
     runs-on: ubuntu-latest
     steps:
       - *checkout_step
@@ -92,22 +109,33 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  build:
-    name: Build
+  package:
+    name: Package (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['22.12.0', '24']
     steps:
       - *checkout_step
       - *setup_pnpm_step
-      - *setup_node_step
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: pnpm
+
       - *install_dependencies_step
 
       - name: Build package
         run: pnpm run build
 
-      - name: Upload build output
-        uses: actions/upload-artifact@v7
-        with:
-          name: dist
-          path: dist/
-          if-no-files-found: error
-          retention-days: 14
+      - name: Check committed JSON Schema
+        run: pnpm run schema:check
+
+      - name: Exercise installed tarball
+        run: pnpm run test:package
+
+      - name: Inspect package contents
+        run: pnpm run pack:check
