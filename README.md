@@ -60,7 +60,7 @@ Read the Yamdown guide.
 
 ## Getting started
 
-Yamdown requires Node.js 22.12 or later. The repository pins its pnpm version;
+Yamdown requires Node.js 24 or later. The repository pins its pnpm version;
 Corepack is the supported bootstrap path when pnpm is not already installed:
 
 ```bash
@@ -315,8 +315,9 @@ pnpm run check           # complete validation pipeline
 ```
 
 The package `prepack` hook builds and checks the schema before a tarball is
-created. CI runs source tests and installed-tarball/package checks on Node
-22.12 and Node 24; coverage is collected once on Node 24.
+created. CI runs source tests and installed-tarball/package checks on the
+Node 24 minimum and the latest Node release; coverage is collected once
+on the latest Node 24 release.
 
 ## Preview boundaries
 

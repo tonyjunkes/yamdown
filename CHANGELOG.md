@@ -3,6 +3,35 @@
 All notable changes to Yamdown are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.10.0 - 2026-08-14
+
+### Added
+
+- Markdown-native preview APIs for profiled `.yamdown.md` documents, portable
+  block, inline-span, and region annotations, clean Markdown projection, and
+  canonical annotated serialization.
+- Typed YAML wrappers that emit the same portable annotations, together with
+  the `yamdown` document descriptor.
+- The tracked `FORMAT.md` grammar and conformance coverage for the Markdown
+  profile.
+
+### Changed
+
+- Reoriented Yamdown around Markdown-superset source while keeping the existing
+  YAML APIs explicit and compatible through 0.x.
+- Expanded CLI input selection to distinguish YAML and Markdown without content
+  sniffing, including strict Markdown checks and complete diagnostics.
+- Added package, schema, and installed-consumer checks to normal CI and a
+  prepack build/schema guard.
+- Raised the minimum supported Node.js release to 24.11.0 and aligned CI and
+  development type definitions with the Node 24 LTS line.
+
+### Fixed
+
+- Hardened deterministic YAML rendering around nested structured inline content,
+  list/task serialization, table data, invalid render options, and render-domain
+  diagnostics.
+
 ## 0.9.0 - 2026-07-15
 
 ### Changed

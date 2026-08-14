@@ -1,7 +1,18 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { renderInline, renderMarkdown, renderYamlMarkdown } from '../src/index.js';
+import {
+  parseMarkdownDocument,
+  renderBlock,
+  renderDocument,
+  renderInline,
+  renderMarkdown,
+  renderMarkdownDocument,
+  renderYamlMarkdown,
+  toMdast,
+  YamdownRenderError,
+  YamdownValidationError
+} from '../src/index.js';
 
 const fixtureDir = join(import.meta.dirname, 'fixtures');
 
@@ -9,23 +20,23 @@ function fixture(name: string): Promise<string> {
   return readFile(join(fixtureDir, name), 'utf8');
 }
 
+function renderDocumentWithInvalidOptions(options: unknown): void {
+  Reflect.apply(renderDocument, undefined, [{ blocks: [] }, options]);
+}
+
 describe('renderMarkdown', () => {
-  test('keeps the explicit YAML renderer and high-level facade equivalent', async () => {
-    const source = await fixture('basic.yaml');
-    expect(renderYamlMarkdown(source)).toBe(renderMarkdown(source));
-  });
   test('renders a basic fixture exactly', async () => {
-    expect(renderMarkdown(await fixture('basic.yaml'))).toBe(await fixture('basic.md'));
+    expect(renderYamlMarkdown(await fixture('basic.yaml'))).toBe(await fixture('basic.md'));
   });
 
   test('preserves raw inline Markdown', async () => {
-    expect(renderMarkdown(await fixture('inline-raw.yaml'))).toBe(
+    expect(renderYamlMarkdown(await fixture('inline-raw.yaml'))).toBe(
       'This is **bold** and [linked](https://example.com).\n'
     );
   });
 
   test('renders a raw Markdown block fixture exactly', async () => {
-    expect(renderMarkdown(await fixture('raw-markdown.yaml'))).toBe(await fixture('raw-markdown.md'));
+    expect(renderYamlMarkdown(await fixture('raw-markdown.yaml'))).toBe(await fixture('raw-markdown.md'));
   });
 
   test('renders structured references, footnotes, and rich table cells exactly', async () => {
@@ -33,7 +44,7 @@ describe('renderMarkdown', () => {
   });
 
   test('mixes structured and raw blocks with table shorthand', async () => {
-    expect(renderMarkdown(await fixture('mixed.yaml'))).toBe(await fixture('mixed.txt'));
+    expect(renderYamlMarkdown(await fixture('mixed.yaml'))).toBe(await fixture('mixed.txt'));
   });
 
   test('normalizes raw Markdown boundaries without changing significant whitespace', () => {
@@ -71,7 +82,7 @@ describe('renderMarkdown', () => {
   });
 
   test('renders structured inline nodes', async () => {
-    expect(renderMarkdown(await fixture('inline-structured.yaml'))).toBe(
+    expect(renderYamlMarkdown(await fixture('inline-structured.yaml'))).toBe(
       'This is **bold** and [linked](https://example.com "Example").\n'
     );
   });
@@ -161,7 +172,7 @@ describe('renderMarkdown', () => {
   });
 
   test('escapes structured text without changing ordinary punctuation', async () => {
-    expect(renderMarkdown(await fixture('structured-safe.yaml'))).toBe(await fixture('structured-safe.md'));
+    expect(renderYamlMarkdown(await fixture('structured-safe.yaml'))).toBe(await fixture('structured-safe.md'));
   });
 
   test('preserves raw Markdown in paragraph and heading text fields', () => {
@@ -176,7 +187,7 @@ describe('renderMarkdown', () => {
   });
 
   test('renders ordered lists and nested list item blocks', async () => {
-    expect(renderMarkdown(await fixture('lists.yaml'))).toBe(
+    expect(renderYamlMarkdown(await fixture('lists.yaml'))).toBe(
       [
         '1. First',
         '2. Second',
@@ -215,7 +226,7 @@ describe('renderMarkdown', () => {
   });
 
   test('uses a longer code fence when content contains triple backticks', async () => {
-    expect(renderMarkdown(await fixture('code.yaml'))).toBe(
+    expect(renderYamlMarkdown(await fixture('code.yaml'))).toBe(
       ['````md', '```ts', 'console.log("hello")', '```', '````', ''].join('\n')
     );
   });
@@ -241,11 +252,11 @@ describe('renderMarkdown', () => {
       renderMarkdown({
         blocks: [{ type: 'code', lang: 'ts\ninvalid', value: 'content' }]
       })
-    ).toThrow(/Code language must be a single line/u);
+    ).toThrow(/Code language must not contain whitespace/u);
   });
 
   test('escapes pipes in table cells', async () => {
-    expect(renderMarkdown(await fixture('tables.yaml'))).toBe(
+    expect(renderYamlMarkdown(await fixture('tables.yaml'))).toBe(
       [
         '| Name | Description |',
         '| --- | --- |',
@@ -360,6 +371,185 @@ describe('renderMarkdown', () => {
     );
 
     expect(markdown).toBe(['> Quoted.', '', '', '---', '', '', '<br>', ''].join('\n'));
+  });
+
+  test('renders YAML annotation wrappers to portable Markdown with parser parity', () => {
+    const source = renderMarkdown({
+      yamdown: { v: 1, profile: 'base' },
+      frontmatter: { title: 'Portable' },
+      blocks: [
+        {
+          type: 'annotatedBlock',
+          id: 'title',
+          kind: 'hero',
+          data: { z: 1, a: 2 },
+          block: { type: 'heading', depth: 1, text: 'Portable' }
+        },
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'text', value: 'Read ' },
+            {
+              type: 'annotatedSpan',
+              id: 'product',
+              kind: 'name',
+              children: [{ type: 'text', value: 'Yamdown' }]
+            },
+            { type: 'text', value: '.' }
+          ]
+        },
+        {
+          type: 'annotatedRegion',
+          id: 'next',
+          kind: 'section',
+          blocks: [{ type: 'paragraph', text: 'Continue.' }]
+        }
+      ]
+    });
+    const parsed = parseMarkdownDocument(source);
+
+    expect(source).toContain('<!-- yamdown:document {"v":1,"profile":"base"} -->');
+    expect(source).toContain('<!-- yamdown:node {"id":"title","kind":"hero","data":{"a":2,"z":1}} -->');
+    expect(parsed.annotations.map((annotation) => [annotation.type, annotation.id])).toEqual([
+      ['node', 'title'],
+      ['span', 'product'],
+      ['region', 'next']
+    ]);
+    expect(renderMarkdownDocument(parsed)).toBe(
+      ['---', 'title: Portable', '---', '', '# Portable', '', 'Read Yamdown.', '', 'Continue.', ''].join('\n')
+    );
+  });
+
+  test('keeps list-leading YAML block and region annotations parser-equivalent', () => {
+    const source = renderMarkdown({
+      yamdown: { v: 1, profile: 'base' },
+      blocks: [
+        {
+          type: 'list',
+          ordered: false,
+          items: [
+            {
+              blocks: [
+                {
+                  type: 'annotatedBlock',
+                  id: 'list-title',
+                  block: { type: 'paragraph', text: 'Annotated block.' }
+                }
+              ]
+            },
+            {
+              blocks: [
+                {
+                  type: 'annotatedRegion',
+                  id: 'list-region',
+                  blocks: [
+                    { type: 'paragraph', text: 'First region paragraph.' },
+                    { type: 'paragraph', text: 'Second region paragraph.' }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+    const parsed = parseMarkdownDocument(source);
+
+    expect(source).toBe(
+      [
+        '<!-- yamdown:document {"v":1,"profile":"base"} -->',
+        '',
+        '- <!-- yamdown:node {"id":"list-title"} -->',
+        '  Annotated block.',
+        '- <!-- yamdown:region {"id":"list-region"} -->',
+        '  First region paragraph.',
+        '',
+        '  Second region paragraph.',
+        '  <!-- yamdown:/region {"id":"list-region"} -->',
+        ''
+      ].join('\n')
+    );
+    expect(parsed.annotations.map((annotation) => [annotation.type, annotation.id])).toEqual([
+      ['node', 'list-title'],
+      ['region', 'list-region']
+    ]);
+    expect(renderMarkdownDocument(parsed)).toBe(
+      '* Annotated block.\n* First region paragraph.\n\n  Second region paragraph.\n'
+    );
+  });
+
+  test('retains nested structured emphasis and strong semantics in mdast', () => {
+    const tree = toMdast({
+      blocks: [
+        {
+          type: 'paragraph',
+          children: [
+            { type: 'emphasis', children: [{ type: 'strong', children: [{ type: 'text', value: 'inside' }] }] },
+            { type: 'text', value: ' ' },
+            { type: 'strong', children: [{ type: 'emphasis', children: [{ type: 'text', value: 'outside' }] }] }
+          ]
+        }
+      ]
+    });
+
+    expect(tree.children[0]).toMatchObject({
+      type: 'paragraph',
+      children: [
+        { type: 'emphasis', children: [{ type: 'strong', children: [{ type: 'text', value: 'inside' }] }] },
+        { type: 'text', value: ' ' },
+        { type: 'strong', children: [{ type: 'emphasis', children: [{ type: 'text', value: 'outside' }] }] }
+      ]
+    });
+  });
+
+  test('rejects invalid render options and list forms with typed render errors', () => {
+    for (const options of [
+      { blankLines: Infinity },
+      { blankLines: 0 },
+      { blankLines: 1.5 },
+      { headingStyle: 'atx' },
+      { bullet: '?' }
+    ]) {
+      expect(() => {
+        renderDocumentWithInvalidOptions(options);
+      }).toThrow(YamdownRenderError);
+    }
+
+    expect(
+      renderBlock(
+        {
+          type: 'list',
+          ordered: false,
+          items: [{ blocks: [{ type: 'paragraph', text: 'Partial option' }] }]
+        },
+        { bullet: '+' }
+      )
+    ).toBe('+ Partial option');
+    expect(() => renderBlock({ type: 'list', ordered: false, start: 1, items: [] })).toThrow(YamdownRenderError);
+  });
+
+  test('keeps tab-indented structured text as text and rejects unsafe table values', () => {
+    const tree = toMdast({
+      blocks: [{ type: 'paragraph', children: [{ type: 'text', value: '\tstill text' }] }]
+    });
+    expect(tree.children[0]).toMatchObject({
+      type: 'paragraph',
+      children: [{ type: 'text', value: '\tstill text' }]
+    });
+
+    const inheritedRow: Record<string, unknown> = {};
+    Object.setPrototypeOf(inheritedRow, { value: 'inherited' });
+    expect(
+      renderMarkdown({
+        blocks: [{ type: 'table', columns: [{ key: 'value', label: 'Value' }], rows: [inheritedRow] }]
+      })
+    ).toBe(['| Value |', '| --- |', '|  |', ''].join('\n'));
+
+    expect(() =>
+      renderMarkdown({
+        blocks: [{ type: 'table', columns: [{ key: 'value', label: 'Value' }], rows: [{ value: Number.NaN }] }]
+      })
+    ).toThrow(YamdownValidationError);
   });
 });
 

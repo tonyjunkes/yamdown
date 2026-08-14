@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/oxfmt/configuration_schema.json",
-  "ignorePatterns": ["dist/**", "*.min.js", ".github/**", ".agents/**"],
+  "ignorePatterns": ["dist/**", "*.min.js", ".github/**", ".agents/**", "schema/yamdown.schema.json"],
   "trailingComma": "none",
   "useTabs": false,
   "tabWidth": 2,

@@ -3,7 +3,15 @@ import { join } from 'node:path';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import type { AnySchema } from 'ajv/dist/2020.js';
 import { describe, expect, test } from 'vitest';
-import { normalizeDocument, yamdownSourceDocumentSchema } from '../src/index.js';
+import {
+  annotatedBlockNodeSchema,
+  annotatedRegionNodeSchema,
+  annotatedSpanInlineSchema,
+  annotationMetadataSchema,
+  normalizeDocument,
+  yamdownDescriptorSchema,
+  yamdownSourceDocumentSchema
+} from '../src/index.js';
 import { createYamdownJsonSchema } from '../src/json-schema.js';
 
 const schemaPath = join(import.meta.dirname, '..', 'schema', 'yamdown.schema.json');
@@ -173,6 +181,45 @@ describe('Yamdown authoring JSON Schema', () => {
 
     expect(validate(unresolved)).toBe(true);
     expect(() => normalizeDocument(unresolved)).toThrow(/Unresolved footnote reference/u);
+  });
+
+  test('validates YAML annotation wrappers through JSON Schema and exported runtime schemas', async () => {
+    const input = {
+      yamdown: { v: 1, profile: 'base' },
+      blocks: [
+        { type: 'annotatedBlock', id: 'title', block: { h1: 'Title' } },
+        {
+          type: 'annotatedRegion',
+          id: 'body',
+          blocks: [
+            {
+              type: 'paragraph',
+              children: [{ type: 'annotatedSpan', id: 'term', children: [{ type: 'text', value: 'Yamdown' }] }]
+            }
+          ]
+        }
+      ]
+    };
+    const validate = createValidator(await readCommittedSchema());
+
+    expect(validate(input)).toBe(true);
+    expect(yamdownSourceDocumentSchema.safeParse(input).success).toBe(true);
+    expect(yamdownDescriptorSchema.safeParse(input.yamdown).success).toBe(true);
+    expect(annotationMetadataSchema.safeParse({ id: 'term', data: { rating: 5 } }).success).toBe(true);
+    expect(
+      annotatedBlockNodeSchema.safeParse({ type: 'annotatedBlock', id: 'title', block: { h1: 'Title' } }).success
+    ).toBe(false);
+    expect(
+      annotatedRegionNodeSchema.safeParse({ type: 'annotatedRegion', id: 'body', blocks: [{ p: 'Body' }] }).success
+    ).toBe(false);
+    expect(
+      annotatedSpanInlineSchema.safeParse({
+        type: 'annotatedSpan',
+        id: 'term',
+        children: [{ type: 'text', value: 'Yamdown' }]
+      }).success
+    ).toBe(true);
+    expect(() => normalizeDocument(input)).not.toThrow();
   });
 });
 

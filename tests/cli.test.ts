@@ -57,6 +57,61 @@ describe('runCli', () => {
     expect(stderr.value).toBe('');
   });
 
+  test('renders profiled Markdown input as its clean Markdown projection', async () => {
+    const input = join(dir, 'input.yamdown.md');
+    await writeFile(
+      input,
+      [
+        '<!-- yamdown:document {"v":1,"profile":"base"} -->',
+        '<!-- yamdown:node {"id":"title"} -->',
+        '# CLI Markdown',
+        ''
+      ].join('\n'),
+      'utf8'
+    );
+    const stdout = new MemoryStream();
+    const stderr = new MemoryStream();
+
+    await expect(runCli(['node', 'yamdown', '--check', input], { stderr, stdout })).resolves.toBe(0);
+    await expect(runCli(['node', 'yamdown', input], { stderr, stdout })).resolves.toBe(0);
+
+    expect(stdout.value).toBe('# CLI Markdown\n');
+    expect(stderr.value).toBe('');
+  });
+
+  test('uses an explicit format for an ambiguous Markdown path', async () => {
+    const input = join(dir, 'input.md');
+    await writeFile(input, '# Explicit Markdown\n', 'utf8');
+    const stdout = new MemoryStream();
+    const stderr = new MemoryStream();
+
+    const missingFormatExitCode = await runCli(['node', 'yamdown', input], { stderr, stdout });
+    expect(missingFormatExitCode).toBe(1);
+    expect(stderr.value).toContain('Cannot determine the input format');
+    expect(stdout.value).toBe('');
+
+    stderr.value = '';
+    const explicitFormatExitCode = await runCli(['node', 'yamdown', '--input-format', 'markdown', input], {
+      stderr,
+      stdout
+    });
+    expect(explicitFormatExitCode).toBe(0);
+    expect(stdout.value).toBe('# Explicit Markdown\n');
+    expect(stderr.value).toBe('');
+  });
+
+  test('requires an explicit format for stdin', async () => {
+    const stderr = new MemoryStream();
+
+    const exitCode = await runCli(['node', 'yamdown', '-'], {
+      stderr,
+      stdout: new MemoryStream()
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.value).toContain('stdin requires --input-format yaml or --input-format markdown');
+  });
+
   test('writes Markdown to an output file', async () => {
     const input = join(dir, 'input.yaml');
     const output = join(dir, 'output.md');
@@ -131,6 +186,22 @@ describe('runCli', () => {
     expect(stderr.value).toContain(`${input}:3:12 error:`);
     expect(stderr.value).toContain('3 |     depth: 9');
     expect(stderr.value).toContain('|            ^');
+  });
+
+  test('prints a source frame for every validation issue', async () => {
+    const input = join(dir, 'multiple-errors.yaml');
+    const stderr = new MemoryStream();
+    await writeFile(input, 'blocks:\n  - type: heading\n    depth: 9\n    text: 42\n', 'utf8');
+
+    const exitCode = await runCli(['node', 'yamdown', '--check', input], {
+      stderr,
+      stdout: new MemoryStream()
+    });
+
+    expect(exitCode).toBe(1);
+    expect(stderr.value).toContain(`${input}:3:12 error:`);
+    expect(stderr.value).toContain(`${input}:4:11 error:`);
+    expect(stderr.value.match(/ error: /gu)).toHaveLength(2);
   });
 
   test('points shorthand validation errors at the shorthand value', async () => {
@@ -227,8 +298,20 @@ describe('runCli', () => {
 
     expect(exitCode).toBe(0);
     expect(stdout.value).toContain('Usage: yamdown [options] [input]');
-    expect(stdout.value).toContain('Author deterministic Markdown with structured YAML.');
+    expect(stdout.value).toContain('Validate and render portable Yamdown Markdown or structured YAML.');
+    expect(stdout.value).toContain('--input-format <yaml|markdown>');
     expect(stdout.value).toContain('--schema');
+    expect(stderr.value).toBe('');
+  });
+
+  test('prints the package version to stdout', async () => {
+    const stdout = new MemoryStream();
+    const stderr = new MemoryStream();
+
+    const exitCode = await runCli(['node', 'yamdown', '--version'], { stderr, stdout });
+
+    expect(exitCode).toBe(0);
+    expect(stdout.value).toBe('0.10.0\n');
     expect(stderr.value).toBe('');
   });
 

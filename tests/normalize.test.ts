@@ -29,7 +29,7 @@ describe('normalizeDocument', () => {
               rows: [{ name: 'YAML' }]
             }
           },
-          { ul: ['One', { checked: true, blocks: [{ quote: [{ p: 'Nested quote' }] }] }] },
+          { ul: ['One', { checked: true, blocks: [{ p: 'Done' }, { quote: [{ p: 'Nested quote' }] }] }] },
           { hr: true },
           { html: '<br>' }
         ]
@@ -52,6 +52,7 @@ describe('normalizeDocument', () => {
             {
               checked: true,
               blocks: [
+                { type: 'paragraph', text: 'Done' },
                 {
                   type: 'blockquote',
                   blocks: [{ type: 'paragraph', text: 'Nested quote' }]
@@ -76,6 +77,74 @@ describe('normalizeDocument', () => {
     expect(input).toEqual({
       blocks: [{ ul: ['One'] }]
     });
+  });
+
+  test('normalizes typed Yamdown annotation wrappers alongside YAML shorthand', () => {
+    expect(
+      normalizeDocument({
+        yamdown: { v: 1, profile: 'base' },
+        blocks: [
+          { type: 'annotatedBlock', id: 'title', block: { h1: 'Title' } },
+          {
+            type: 'annotatedRegion',
+            id: 'body',
+            blocks: [
+              {
+                type: 'paragraph',
+                children: [{ type: 'annotatedSpan', id: 'term', children: [{ type: 'text', value: 'Yamdown' }] }]
+              }
+            ]
+          }
+        ]
+      })
+    ).toEqual({
+      yamdown: { v: 1, profile: 'base' },
+      blocks: [
+        { type: 'annotatedBlock', id: 'title', block: { type: 'heading', depth: 1, text: 'Title' } },
+        {
+          type: 'annotatedRegion',
+          id: 'body',
+          blocks: [
+            {
+              type: 'paragraph',
+              children: [{ type: 'annotatedSpan', id: 'term', children: [{ type: 'text', value: 'Yamdown' }] }]
+            }
+          ]
+        }
+      ]
+    });
+  });
+
+  test('rejects missing descriptors, duplicate annotation ids, empty scopes, and cyclic input', () => {
+    expect(() =>
+      normalizeDocument({
+        blocks: [{ type: 'annotatedBlock', id: 'title', block: { h1: 'Title' } }]
+      })
+    ).toThrow(/annotations require a yamdown descriptor/u);
+
+    expect(() =>
+      normalizeDocument({
+        yamdown: { v: 1, profile: 'base' },
+        blocks: [
+          { type: 'annotatedBlock', id: 'same', block: { h1: 'Title' } },
+          {
+            type: 'paragraph',
+            children: [{ type: 'annotatedSpan', id: 'same', children: [{ type: 'text', value: 'Term' }] }]
+          }
+        ]
+      })
+    ).toThrow(/Duplicate annotation identifier/u);
+
+    expect(() =>
+      normalizeDocument({
+        yamdown: { v: 1, profile: 'base' },
+        blocks: [{ type: 'annotatedRegion', id: 'empty', blocks: [] }]
+      })
+    ).toThrow(/Annotated regions must contain at least one block/u);
+
+    const cyclic: { blocks: unknown[] } = { blocks: [] };
+    cyclic.blocks.push(cyclic);
+    expect(() => normalizeDocument(cyclic)).toThrow(/Cyclic input is not supported/u);
   });
 
   test('normalizes array list items, code shorthand, and nested inline children', () => {

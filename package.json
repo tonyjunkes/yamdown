@@ -1,13 +1,14 @@
 {
   "name": "yamdown",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
-  "description": "Structured YAML authoring for deterministic Markdown output.",
+  "description": "Markdown-superset annotations and structured YAML for deterministic, machine-manipulable Markdown.",
   "keywords": [
     "converter",
     "documentation",
     "generator",
     "markdown",
+    "markdown-superset",
     "mdast",
     "remark",
     "structured-authoring",
@@ -29,6 +30,7 @@
   "files": [
     "dist",
     "schema",
+    "FORMAT.md",
     "README.md",
     "CHANGELOG.md",
     "LICENSE"
@@ -53,9 +55,11 @@
     "lint:fix": "oxlint --fix",
     "lint:github": "oxlint --format=github",
     "schema:generate": "pnpm run build && node scripts/generate-schema.mjs",
+    "schema:check": "pnpm run build && node scripts/check-schema.mjs",
     "pack:check": "pnpm pack --dry-run",
     "test:package": "node scripts/smoke-package.mjs",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run fmt:check && pnpm run test && pnpm run build && pnpm run test:package"
+    "prepack": "pnpm run schema:check",
+    "check": "pnpm run typecheck && pnpm run lint && pnpm run fmt:check && pnpm run test && pnpm run schema:check && pnpm run test:package"
   },
   "dependencies": {
     "@types/mdast": "^4.0.4",
@@ -63,24 +67,25 @@
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-frontmatter": "^2.0.1",
     "mdast-util-gfm": "^3.1.0",
+    "mdast-util-to-markdown": "^2.1.2",
     "micromark-extension-frontmatter": "^2.0.0",
     "micromark-extension-gfm": "^3.0.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.2.0",
     "@vitest/coverage-v8": "4.1.10",
     "ajv": "^8.20.0",
-    "oxfmt": "^0.59.0",
-    "oxlint": "^1.74.0",
-    "oxlint-tsgolint": "^0.24.0",
-    "tsdown": "^0.22.8",
+    "oxfmt": "^0.63.0",
+    "oxlint": "^1.78.0",
+    "oxlint-tsgolint": "^7.0.2001",
+    "tsdown": "^0.22.14",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=24.11.0"
   },
-  "packageManager": "pnpm@11.11.0+sha512.4463f65fd80ed80d69bc1d4bf163ee94f605c7380fc318bb5b2ebe15f8cd12d49c51a4d59e951b401e764d3b6ca751cbf51bc50ed7001a6bcb4935e684c34882"
+  "packageManager": "pnpm@11.21.0+sha512.521705bce689924eac72f5a3587122f362689ef6571e55ba80076fd637c11132ecffada26fad4ea79c485bfddbfd3d5a2a5b05805a77e893de71ec8a6cca3bb1"
 }

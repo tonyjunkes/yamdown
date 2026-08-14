@@ -5,7 +5,7 @@ import { gfmFromMarkdown } from 'mdast-util-gfm';
 import { frontmatter } from 'micromark-extension-frontmatter';
 import { gfm } from 'micromark-extension-gfm';
 import { describe, expect, test } from 'vitest';
-import { documentToMdast, renderMarkdown, toMdast } from '../src/index.js';
+import { documentToMdast, parseYamlDocument, renderYamlMarkdown, toMdast } from '../src/index.js';
 
 describe('toMdast', () => {
   test('keeps the document-only and high-level mdast APIs equivalent', () => {
@@ -270,13 +270,14 @@ blocks:
   - p: Visit https://example.com
 `;
     const options = { bullet: '+' as const, codeFence: '~' as const };
-    const markdown = renderMarkdown(source, options);
+    const markdown = renderYamlMarkdown(source, options);
     const expected = fromMarkdown(markdown, {
       extensions: [gfm(), frontmatter()],
       mdastExtensions: [gfmFromMarkdown(), frontmatterFromMarkdown()]
     });
 
-    expect(toMdast(source, options)).toEqual(expected);
-    expect(toMdast(source, options).position?.end.offset).toBe(markdown.length);
+    const root = documentToMdast(parseYamlDocument(source), options);
+    expect(root).toEqual(expected);
+    expect(root.position?.end.offset).toBe(markdown.length);
   });
 });

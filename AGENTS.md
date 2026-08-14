@@ -1,4 +1,4 @@
-<!-- FOR AI AGENTS | Last updated: 2026-06-21 | Verify commands against package.json and CI. -->
+<!-- FOR AI AGENTS | Last updated: 2026-08-14 | Verify commands against package.json and CI. -->
 
 # AGENTS.md
 
@@ -15,7 +15,8 @@
 
 ## Commands
 
-Use `pnpm`; Node.js 22.12+ is required. CI uses Node.js 24.
+Use `pnpm`; Node.js 24+ is required. CI verifies the minimum and latest
+Node.js 24 releases.
 
 | Task               | Command                                 |
 | ------------------ | --------------------------------------- |

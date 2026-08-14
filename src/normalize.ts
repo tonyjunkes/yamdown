@@ -1,4 +1,4 @@
-import { validationErrorFromZodIssues } from './errors.js';
+import { formatPath, YamdownValidationError, validationErrorFromZodIssues } from './errors.js';
 import { sourceDocumentSchema, yamdownDocumentSchema } from './schema.js';
 import type { BlockNode, ListItemNode, YamdownDocument } from './types.js';
 import type { SourceRange } from './errors.js';
@@ -20,6 +20,8 @@ export function normalizeDocumentWithSourceLocations(
   input: unknown,
   locate?: (path: DocumentPath) => SourceRange | undefined
 ): YamdownDocument {
+  assertAcyclic(input, locate);
+
   const sourceResult = sourceDocumentSchema.safeParse(input);
   if (!sourceResult.success) {
     throw validationErrorFromZodIssues(sourceResult.error.issues, locate);
@@ -168,6 +170,22 @@ function normalizeVerboseBlock(
   sourcePath: DocumentPath
 ): unknown {
   switch (input.type) {
+    case 'annotatedBlock':
+      recordOrigin(context, [...normalizedPath, 'block'], [...sourcePath, 'block']);
+      return {
+        ...input,
+        block: normalizeBlock(input.block, context, [...normalizedPath, 'block'], [...sourcePath, 'block'])
+      };
+    case 'annotatedRegion':
+      recordOrigin(context, [...normalizedPath, 'blocks'], [...sourcePath, 'blocks']);
+      return {
+        ...input,
+        blocks: Array.isArray(input.blocks)
+          ? input.blocks.map((block, index) =>
+              normalizeBlock(block, context, [...normalizedPath, 'blocks', index], [...sourcePath, 'blocks', index])
+            )
+          : input.blocks
+      };
     case 'list':
       return {
         ...input,
@@ -291,4 +309,43 @@ export function resolveOrigin(origins: ReadonlyMap<string, DocumentPath>, path: 
   }
 
   return path;
+}
+
+function assertAcyclic(input: unknown, locate?: (path: DocumentPath) => SourceRange | undefined): void {
+  const ancestors = new WeakSet();
+
+  const visit = (value: unknown, path: DocumentPath): void => {
+    if (typeof value !== 'object' || value === null) {
+      return;
+    }
+
+    if (ancestors.has(value)) {
+      const location = locate?.(path);
+      throw new YamdownValidationError(
+        `Invalid Yamdown document at ${formatPath(path)}: Cyclic input is not supported`,
+        [
+          {
+            code: 'custom',
+            location,
+            message: 'Cyclic input is not supported',
+            path
+          }
+        ]
+      );
+    }
+
+    ancestors.add(value);
+    if (Array.isArray(value)) {
+      for (const [index, item] of value.entries()) {
+        visit(item, [...path, index]);
+      }
+    } else if (isRecord(value)) {
+      for (const key of Object.keys(value)) {
+        visit(value[key], [...path, key]);
+      }
+    }
+    ancestors.delete(value);
+  };
+
+  visit(input, []);
 }

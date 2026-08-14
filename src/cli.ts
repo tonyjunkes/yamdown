@@ -4,14 +4,18 @@ import { pathToFileURL } from 'node:url';
 import { Command, CommanderError } from 'commander';
 import { YamdownError, YamdownValidationError, YamdownYamlParseError } from './errors.js';
 import type { SourceRange } from './errors.js';
+import { parseMarkdownDocument, renderMarkdownDocument } from './markdown-document.js';
 import { parseYamlDocument, renderYamlMarkdown } from './yaml.js';
 
 interface CliOptions {
   check?: boolean;
   debug?: boolean;
+  inputFormat?: string;
   output?: string;
   schema?: boolean;
 }
+
+type InputFormat = 'markdown' | 'yaml';
 
 interface WritableStreamLike {
   write(chunk: string): boolean;
@@ -23,6 +27,9 @@ interface CliIO {
 }
 
 const DEFAULT_IO: CliIO = { stderr: process.stderr, stdout: process.stdout };
+// Keep this in sync with package.json. The bundled CLI cannot read the source
+// package manifest once it has been installed from a tarball.
+const VERSION = '0.10.0';
 
 export async function runCli(argv: readonly string[] = process.argv, io: CliIO = DEFAULT_IO): Promise<number> {
   const program = new Command();
@@ -32,8 +39,10 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
 
   program
     .name('yamdown')
-    .description('Author deterministic Markdown with structured YAML.')
-    .argument('[input]', 'YAML input file')
+    .description('Validate and render portable Yamdown Markdown or structured YAML.')
+    .version(VERSION, '--version', 'output the installed version')
+    .argument('[input]', 'YAML or Markdown input file; use - for stdin')
+    .option('--input-format <yaml|markdown>', 'select the input format for stdin or ambiguous paths')
     .option('-o, --output <file>', 'write Markdown to a file')
     .option('--check', 'validate input without rendering Markdown')
     .option('--debug', 'print stack traces for unexpected errors')
@@ -49,8 +58,15 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
     })
     .action(async (input: string | undefined, options: CliOptions) => {
       if (options.schema === true) {
-        if (input !== undefined || options.check === true || options.output !== undefined) {
-          program.error('--schema cannot be combined with an input file, --check, or --output');
+        if (
+          input !== undefined ||
+          options.check === true ||
+          options.inputFormat !== undefined ||
+          options.output !== undefined
+        ) {
+          program.error(
+            '--schema cannot be combined with an input file, --check, or --output; --input-format is also unavailable'
+          );
         }
 
         io.stdout.write(await readFile(new URL('../schema/yamdown.schema.json', import.meta.url), 'utf8'));
@@ -62,16 +78,26 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
         return;
       }
 
-      inputPath = input;
-      const yaml = await readFile(input, 'utf8');
-      inputSource = yaml;
-
-      if (options.check === true) {
-        parseYamlDocument(yaml);
+      const inputFormat = resolveInputFormat(input, options.inputFormat, program);
+      if (inputFormat === undefined) {
         return;
       }
 
-      const markdown = renderYamlMarkdown(yaml);
+      inputPath = input === '-' ? '<stdin>' : input;
+      const source = input === '-' ? await readStandardInput() : await readFile(input, 'utf8');
+      inputSource = source;
+
+      if (options.check === true) {
+        if (inputFormat === 'yaml') {
+          parseYamlDocument(source);
+        } else {
+          parseMarkdownDocument(source);
+        }
+        return;
+      }
+
+      const markdown =
+        inputFormat === 'yaml' ? renderYamlMarkdown(source) : renderMarkdownDocument(parseMarkdownDocument(source));
       if (options.output !== undefined) {
         outputPath = options.output;
         await writeFile(options.output, markdown, 'utf8');
@@ -111,16 +137,81 @@ export async function runCli(argv: readonly string[] = process.argv, io: CliIO =
   }
 }
 
-function formatCliError(error: YamdownError, inputPath?: string, source?: string): string {
-  const location =
-    error instanceof YamdownYamlParseError
-      ? error.location
-      : error instanceof YamdownValidationError
-        ? error.issues[0]?.location
-        : undefined;
+function resolveInputFormat(
+  input: string | undefined,
+  requestedFormat: string | undefined,
+  program: Command
+): InputFormat | undefined {
+  if (requestedFormat !== undefined) {
+    if (requestedFormat === 'yaml' || requestedFormat === 'markdown') {
+      return requestedFormat;
+    }
 
+    program.error('--input-format must be either "yaml" or "markdown"');
+    return undefined;
+  }
+
+  if (input === undefined) {
+    program.error("missing required argument 'input'");
+    return undefined;
+  }
+
+  if (input === '-') {
+    program.error('stdin requires --input-format yaml or --input-format markdown');
+    return undefined;
+  }
+
+  const lowerCasePath = input.toLocaleLowerCase('en-US');
+  if (lowerCasePath.endsWith('.yaml') || lowerCasePath.endsWith('.yml')) {
+    return 'yaml';
+  }
+
+  if (lowerCasePath.endsWith('.yamdown.md')) {
+    return 'markdown';
+  }
+
+  program.error(`Cannot determine the input format for ${input}; use --input-format yaml or --input-format markdown`);
+  return undefined;
+}
+
+async function readStandardInput(): Promise<string> {
+  process.stdin.setEncoding('utf8');
+  let source = '';
+  for await (const chunk of process.stdin) {
+    source += chunk;
+  }
+  return source;
+}
+
+function formatCliError(error: YamdownError, inputPath?: string, source?: string): string {
+  if (error instanceof YamdownValidationError) {
+    if (error.issues.length === 0) {
+      return `${error.message}\n`;
+    }
+
+    return error.issues
+      .map((issue, index) =>
+        formatCliDiagnostic(index === 0 ? error.message : issue.message, issue.location, inputPath, source)
+      )
+      .join('');
+  }
+
+  return formatCliDiagnostic(
+    error.message,
+    error instanceof YamdownYamlParseError ? error.location : undefined,
+    inputPath,
+    source
+  );
+}
+
+function formatCliDiagnostic(
+  message: string,
+  location: SourceRange | undefined,
+  inputPath: string | undefined,
+  source: string | undefined
+): string {
   if (location === undefined || inputPath === undefined || source === undefined) {
-    return `${error.message}\n`;
+    return `${message}\n`;
   }
 
   const { line, column } = location.start;
@@ -129,7 +220,7 @@ function formatCliError(error: YamdownError, inputPath?: string, source?: string
   const gutter = String(line);
 
   return [
-    `${inputPath}:${line}:${column} error: ${error.message}`,
+    `${inputPath}:${line}:${column} error: ${message}`,
     `${gutter} | ${sourceLine}`,
     `${' '.repeat(gutter.length)} | ${' '.repeat(Math.max(0, column - 1))}${'^'.repeat(markerWidth)}`,
     ''

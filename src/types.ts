@@ -1,11 +1,42 @@
 export interface YamdownDocument {
+  /**
+   * Opts the document into the Yamdown Markdown annotation profile when it is
+   * rendered from YAML. Documents without this descriptor remain ordinary
+   * YAML-to-Markdown documents.
+   */
+  readonly yamdown?: YamdownDescriptor;
   readonly frontmatter?: Readonly<Record<string, unknown>>;
   readonly blocks: readonly DocumentNode[];
 }
 
+export interface YamdownDescriptor {
+  readonly v: 1;
+  readonly profile: 'base';
+}
+
+/** JSON values accepted as portable annotation metadata. */
+export type AnnotationData = null | boolean | number | string | AnnotationDataArray | AnnotationDataObject;
+
+export interface AnnotationDataArray extends ReadonlyArray<AnnotationData> {}
+
+export interface AnnotationDataObject {
+  readonly [key: string]: AnnotationData;
+}
+
+export interface AnnotationMetadata {
+  /** A document-wide unique, author-provided annotation identifier. */
+  readonly id: string;
+  /** Optional profile-defined semantic kind. */
+  readonly kind?: string;
+  /** Optional profile-defined JSON metadata. */
+  readonly data?: AnnotationData;
+}
+
 export type DocumentNode = BlockNode | DefinitionNode | FootnoteDefinitionNode;
 
-export type BlockNode =
+export type BlockNode = RenderableBlockNode | AnnotatedBlockNode | AnnotatedRegionNode;
+
+export type RenderableBlockNode =
   | HeadingNode
   | ParagraphNode
   | MarkdownNode
@@ -15,6 +46,22 @@ export type BlockNode =
   | ThematicBreakNode
   | TableNode
   | HtmlNode;
+
+/**
+ * Emits a `yamdown:node` comment immediately before a visible block.
+ * Annotation wrappers deliberately cannot wrap raw `markdown` differently:
+ * raw content stays opaque and is simply the visible target.
+ */
+export interface AnnotatedBlockNode extends AnnotationMetadata {
+  readonly type: 'annotatedBlock';
+  readonly block: RenderableBlockNode;
+}
+
+/** Emits a paired `yamdown:region` comment around sibling block content. */
+export interface AnnotatedRegionNode extends AnnotationMetadata {
+  readonly type: 'annotatedRegion';
+  readonly blocks: readonly BlockNode[];
+}
 
 export type HeadingNode =
   | {
@@ -119,7 +166,14 @@ export type InlineNode =
   | ImageInline
   | ImageReferenceInline
   | FootnoteReferenceInline
-  | BreakInline;
+  | BreakInline
+  | AnnotatedSpanInline;
+
+/** Emits paired `yamdown:span` comments around a contiguous inline range. */
+export interface AnnotatedSpanInline extends AnnotationMetadata {
+  readonly type: 'annotatedSpan';
+  readonly children: readonly InlineNode[];
+}
 
 export interface TextInline {
   readonly type: 'text';
@@ -183,7 +237,6 @@ export interface BreakInline {
 
 export interface RenderOptions {
   readonly frontmatter?: boolean;
-  readonly headingStyle?: 'atx';
   readonly bullet?: '-' | '*' | '+';
   readonly orderedDelimiter?: '.' | ')';
   readonly codeFence?: '`' | '~';
