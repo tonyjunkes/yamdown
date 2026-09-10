@@ -1,6 +1,6 @@
 {
-  "name": "yamdown",
-  "version": "0.11.1",
+  "name": "@tonyjunkes/yamdown",
+  "version": "0.11.2",
   "description": "Markdown-superset annotations and structured YAML for deterministic, machine-manipulable Markdown.",
   "keywords": [
     "converter",
@@ -18,13 +18,28 @@
   "bugs": {
     "url": "https://github.com/tonyjunkes/yamdown/issues"
   },
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/tonyjunkes/yamdown.git"
   },
+  "license": "MIT",
+  "author": "Tony Junkes (https://tonyjunkes.dev)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./schema.json": "./schema/yamdown.schema.json"
+  },
+  "main": "dist/index.js",
   "bin": {
-    "yamdown": "./dist/cli.mjs"
+    "yamdown": "dist/cli.mjs"
+  },
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
   },
   "files": [
     "dist",
@@ -34,14 +49,6 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
-  "type": "module",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs"
-    },
-    "./schema.json": "./schema/yamdown.schema.json"
-  },
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",

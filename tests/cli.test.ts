@@ -311,7 +311,7 @@ describe('runCli', () => {
     const exitCode = await runCli(['node', 'yamdown', '--version'], { stderr, stdout });
 
     expect(exitCode).toBe(0);
-    expect(stdout.value).toBe('0.11.1\n');
+    expect(stdout.value).toBe('0.11.2\n');
     expect(stderr.value).toBe('');
   });
 
