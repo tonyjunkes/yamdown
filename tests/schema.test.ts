@@ -40,6 +40,8 @@ describe('Yamdown authoring JSON Schema', () => {
       frontmatter: { title: 'Schema coverage', draft: false },
       blocks: [
         { h1: 'Shorthand heading' },
+        { element: { name: 'task', attrs: { id: 'a', count: 2, enabled: true }, blocks: [{ p: 'Instructions' }] } },
+        { type: 'element', name: 'context', blocks: [{ element: { name: 'document', blocks: [] } }] },
         { h2: 'Second heading' },
         { h3: 'Third heading' },
         { h4: 'Fourth heading' },
@@ -126,6 +128,17 @@ describe('Yamdown authoring JSON Schema', () => {
       { blocks: [{ table: { columns: [{ key: 'name', label: 'Name', align: 'justify' }], rows: [] } }] }
     ],
     ['zero-column shorthand table', { blocks: [{ table: { columns: [], rows: [] } }] }],
+    ['invalid element name', { blocks: [{ element: { name: 'bad name', blocks: [] } }] }],
+    [
+      'reserved element attribute name',
+      { blocks: [{ element: { name: 'task', attrs: { ['__proto__']: 'value' }, blocks: [] } }] }
+    ],
+    [
+      'invalid element attribute name',
+      { blocks: [{ element: { name: 'task', attrs: { 'bad key': 'x' }, blocks: [] } }] }
+    ],
+    ['invalid element attribute value', { blocks: [{ type: 'element', name: 'task', attrs: { id: {} }, blocks: [] }] }],
+    ['missing element children', { blocks: [{ element: { name: 'task' } }] }],
     ['zero-column verbose table', { blocks: [{ type: 'table', columns: [], rows: [] }] }],
     ['invalid inline node', { blocks: [{ type: 'paragraph', children: [{ text: 'Missing type' }] }] }],
     ['invalid thematic break shorthand', { blocks: [{ hr: false }] }],

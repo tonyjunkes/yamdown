@@ -1,7 +1,6 @@
 {
   "name": "yamdown",
-  "version": "0.10.0",
-  "private": true,
+  "version": "0.11.0",
   "description": "Markdown-superset annotations and structured YAML for deterministic, machine-manipulable Markdown.",
   "keywords": [
     "converter",
@@ -15,7 +14,7 @@
     "unified",
     "yaml"
   ],
-  "homepage": "https://github.com/tonyjunkes/yamdown#readme",
+  "homepage": "https://github.com/tonyjunkes/yamdown",
   "bugs": {
     "url": "https://github.com/tonyjunkes/yamdown/issues"
   },
@@ -71,21 +70,21 @@
     "micromark-extension-frontmatter": "^2.0.0",
     "micromark-extension-gfm": "^3.0.0",
     "yaml": "^2.9.0",
-    "zod": "^4.4.3"
+    "zod": "^4.6.1"
   },
   "devDependencies": {
-    "@types/node": "^26.2.0",
-    "@vitest/coverage-v8": "4.1.10",
+    "@types/node": "^26.5.0",
+    "@vitest/coverage-v8": "5.0.0",
     "ajv": "^8.20.0",
-    "oxfmt": "^0.63.0",
-    "oxlint": "^1.78.0",
+    "oxfmt": "^0.67.0",
+    "oxlint": "^1.82.0",
     "oxlint-tsgolint": "^7.0.2001",
-    "tsdown": "^0.22.14",
+    "tsdown": "^0.23.0",
     "typescript": "^7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "^5.0.0"
   },
   "engines": {
     "node": ">=24.11.0"
   },
-  "packageManager": "pnpm@11.21.0+sha512.521705bce689924eac72f5a3587122f362689ef6571e55ba80076fd637c11132ecffada26fad4ea79c485bfddbfd3d5a2a5b05805a77e893de71ec8a6cca3bb1"
+  "packageManager": "pnpm@12.3.4"
 }

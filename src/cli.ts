@@ -1,6 +1,6 @@
 #!/usr/bin/env node
+import { realpathSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
 import { Command, CommanderError } from 'commander';
 import { YamdownError, YamdownValidationError, YamdownYamlParseError } from './errors.js';
 import type { SourceRange } from './errors.js';
@@ -29,7 +29,7 @@ interface CliIO {
 const DEFAULT_IO: CliIO = { stderr: process.stderr, stdout: process.stdout };
 // Keep this in sync with package.json. The bundled CLI cannot read the source
 // package manifest once it has been installed from a tarball.
-const VERSION = '0.10.0';
+const VERSION = '0.11.0';
 
 export async function runCli(argv: readonly string[] = process.argv, io: CliIO = DEFAULT_IO): Promise<number> {
   const program = new Command();
@@ -245,7 +245,19 @@ function isNodeError(error: unknown): error is Error & { code: string; path: str
   );
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+function isMainModule(): boolean {
+  if (process.argv[1] === undefined) {
+    return false;
+  }
+  try {
+    return realpathSync(import.meta.filename) === realpathSync(process.argv[1]);
+  } catch {
+    // Embedded callers can supply an argv label that is not a filesystem path.
+    return false;
+  }
+}
+
+if (isMainModule()) {
   const exitCode = await runCli();
   process.exitCode = exitCode;
 }

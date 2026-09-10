@@ -1,5 +1,4 @@
 allowBuilds:
   esbuild: false
 minimumReleaseAgeExclude:
-  - tsdown@0.22.14
-  - '@types/node@24.13.3'
+  - zod@4.6.1

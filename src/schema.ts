@@ -26,6 +26,29 @@ export const yamdownDescriptorSchema: z.ZodType<YamdownDescriptor> = z
     profile: z.literal('base')
   })
   .strict();
+const elementFields = {
+  name: z
+    .string()
+    .regex(
+      /^[A-Za-z][A-Za-z0-9-]*$/u,
+      'Element names must start with an ASCII letter and contain only letters, digits, and hyphens'
+    ),
+  attrs: z
+    .unknown()
+    .superRefine((value, context) => {
+      // Zod strips this key before record key/value validation can see it.
+      if (typeof value === 'object' && value !== null && Object.hasOwn(value, '__proto__')) {
+        context.addIssue({ code: 'custom', message: 'Reserved element attribute name', path: ['__proto__'] });
+      }
+    })
+    .pipe(
+      z.record(
+        z.string().regex(/^(?!__proto__$)[A-Za-z_][A-Za-z0-9_.-]*$/u, 'Invalid element attribute name'),
+        z.union([z.string(), z.number(), z.boolean()])
+      )
+    )
+    .optional()
+};
 const depthSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4), z.literal(5), z.literal(6)]);
 const tableAlignmentSchema = z.union([z.literal('left'), z.literal('center'), z.literal('right')]);
 const identifierSchema = z
@@ -277,6 +300,7 @@ export const listItemSchema: z.ZodType<ListItemNode> = z.lazy(() =>
 
 const renderableBlockNodeSchema: z.ZodType<RenderableBlockNode> = z.lazy(() =>
   z.union([
+    z.object({ type: z.literal('element'), ...elementFields, blocks: z.array(blockNodeSchema) }).strict(),
     headingSchema,
     paragraphSchema,
     markdownSchema,
@@ -372,6 +396,8 @@ const sourceListItemSchema: z.ZodType = z.lazy(() =>
 
 const sourceRenderableBlockNodeSchema: z.ZodType = z.lazy(() =>
   z.union([
+    z.object({ type: z.literal('element'), ...elementFields, blocks: z.array(sourceBlockNodeSchema) }).strict(),
+    z.object({ element: z.object({ ...elementFields, blocks: z.array(sourceBlockNodeSchema) }).strict() }).strict(),
     headingSchema,
     paragraphSchema,
     markdownSchema,
@@ -593,6 +619,7 @@ function walkBlockForReferences(
       }
       return;
     case 'blockquote':
+    case 'element':
       walkBlocksForReferences(block.blocks, [...path, 'blocks'], references);
       return;
     case 'table':
@@ -650,6 +677,7 @@ function walkBlockForAnnotations(
       }
       return;
     case 'blockquote':
+    case 'element':
       walkBlocksForAnnotations(block.blocks, [...path, 'blocks'], register);
       return;
     case 'table':

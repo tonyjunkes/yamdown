@@ -45,6 +45,7 @@ export type RenderableBlockNode =
   | BlockquoteNode
   | ThematicBreakNode
   | TableNode
+  | ElementNode
   | HtmlNode;
 
 /**
@@ -60,6 +61,13 @@ export interface AnnotatedBlockNode extends AnnotationMetadata {
 /** Emits a paired `yamdown:region` comment around sibling block content. */
 export interface AnnotatedRegionNode extends AnnotationMetadata {
   readonly type: 'annotatedRegion';
+  readonly blocks: readonly BlockNode[];
+}
+
+export interface ElementNode {
+  readonly type: 'element';
+  readonly name: string;
+  readonly attrs?: Readonly<Record<string, string | number | boolean>>;
   readonly blocks: readonly BlockNode[];
 }
 

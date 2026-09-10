@@ -50,6 +50,7 @@ export type {
   DefinitionNode,
   DeleteInline,
   DocumentNode,
+  ElementNode,
   EmphasisInline,
   FootnoteDefinitionNode,
   FootnoteReferenceInline,

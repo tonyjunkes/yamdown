@@ -2,7 +2,7 @@
 import { execFile } from 'node:child_process';
 import { access, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, extname, join } from 'node:path';
 import { promisify } from 'node:util';
 
 // oxlint-disable-next-line typescript/strict-void-return -- Node provides an official promisified execFile overload.
@@ -92,6 +92,9 @@ try {
   if (declarations.includes('YamlMarkdownDocument')) {
     throw new Error('Installed declarations still expose YamlMarkdownDocument.');
   }
+  if (!declarations.includes('ElementNode')) {
+    throw new Error('Installed declarations do not expose ElementNode.');
+  }
 
   const formatSpecification = await readFile(join(installedPackageDirectory, 'FORMAT.md'), 'utf8');
   if (!formatSpecification.includes('Yamdown Markdown format')) {
@@ -121,6 +124,9 @@ try {
         "const gfm = renderMarkdown({ blocks: [{ type: 'list', ordered: false, items: [{ checked: true, blocks: [{ type: 'paragraph', text: 'Done' }] }] }, { type: 'table', columns: [{ key: 'name', label: 'Name', align: 'center' }], rows: [{ name: 'Yamdown' }] }, { type: 'code', lang: 'ts', meta: 'title=\"demo.ts\"', value: 'console.log(\"hello\")' }] });",
         "if (!gfm.includes('- [x] Done') || !gfm.includes('| :---: |') || !gfm.includes('```ts title=\"demo.ts\"')) throw new Error(`Unexpected GFM output: ${JSON.stringify(gfm)}`);",
         "const tree = toMdast({ blocks: [{ type: 'paragraph', text: '**semantic**' }] });",
+        "const elementSource = 'blocks:\\n  - element:\\n      name: context\\n      attrs: { id: demo }\\n      blocks:\\n        - p: Hello\\n';",
+        "if (renderMarkdown(elementSource) !== '<context id=\"demo\">\\n\\nHello\\n\\n</context>\\n') throw new Error('Installed element rendering failed');",
+        "if (toMdast(elementSource).children[0]?.type !== 'html') throw new Error('Installed element mdast conversion failed');",
         "if (tree.children[0]?.type !== 'paragraph' || tree.children[0].children[0]?.type !== 'strong') throw new Error('Official mdast conversion failed');",
         "if (documentToMdast({ blocks: [{ type: 'paragraph', text: 'Document' }] }).children[0]?.type !== 'paragraph') throw new Error('Document mdast conversion failed');",
         "const references = renderMarkdown({ blocks: [{ type: 'paragraph', children: [{ type: 'linkReference', identifier: 'docs', children: [{ type: 'text', value: 'Docs' }] }, { type: 'footnoteReference', identifier: 'note' }] }, { type: 'table', columns: [{ key: 'value', label: 'Value' }], rows: [{ value: { type: 'inline', children: [{ type: 'strong', children: [{ type: 'text', value: 'Rich' }] }] } }] }, { type: 'definition', identifier: 'docs', url: 'https://example.com' }, { type: 'footnoteDefinition', identifier: 'note', blocks: [{ type: 'paragraph', text: 'Note' }] }] });",
@@ -131,6 +137,14 @@ try {
   );
 
   const inputPath = join(consumerDirectory, 'input.yaml');
+  await runNode(
+    [
+      '--input-type=module',
+      '--eval',
+      "process.argv[1] = 'nonexistent-embedded-entry'; await import('./node_modules/yamdown/dist/cli.mjs');"
+    ],
+    consumerDirectory
+  );
   await writeFile(inputPath, 'blocks:\n  - h1: Installed\n', 'utf8');
   const { stdout } = await runPnpm(['exec', 'yamdown', inputPath], consumerDirectory);
 
@@ -198,7 +212,10 @@ try {
  * @param {string} cwd working directory
  */
 function runPnpm(arguments_, cwd) {
-  return runNode([pnpmExecutable, ...arguments_], cwd);
+  if (['.cjs', '.js', '.mjs'].includes(extname(pnpmExecutable).toLowerCase())) {
+    return runNode([pnpmExecutable, ...arguments_], cwd);
+  }
+  return runExecutable(pnpmExecutable, arguments_, cwd);
 }
 
 /**
@@ -206,7 +223,16 @@ function runPnpm(arguments_, cwd) {
  * @param {string} cwd working directory
  */
 function runNode(arguments_, cwd) {
-  return execFileAsync(process.execPath, arguments_, {
+  return runExecutable(process.execPath, arguments_, cwd);
+}
+
+/**
+ * @param {string} executable executable path
+ * @param {string[]} arguments_ executable arguments
+ * @param {string} cwd working directory
+ */
+function runExecutable(executable, arguments_, cwd) {
+  return execFileAsync(executable, arguments_, {
     cwd,
     encoding: 'utf8',
     env: process.env,

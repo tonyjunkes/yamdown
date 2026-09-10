@@ -25,6 +25,51 @@ function renderDocumentWithInvalidOptions(options: unknown): void {
 }
 
 describe('renderMarkdown', () => {
+  test('renders nested elements exactly', async () => {
+    expect(renderYamlMarkdown(await fixture('elements.yaml'))).toBe(await fixture('elements.md'));
+  });
+  test('renders block arrays larger than the JavaScript argument-count limit', () => {
+    const blocks = Array.from({ length: 150_000 }, () => ({ type: 'paragraph' as const, text: 'x' }));
+    expect(renderDocument({ blocks })).toBe(`${'x\n\n'.repeat(blocks.length - 1)}x\n`);
+  });
+
+  test('escapes text across node boundaries and preserves closing heading hashes', () => {
+    expect(
+      renderMarkdown({
+        blocks: [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'text', value: '1' },
+              { type: 'text', value: '. item' }
+            ]
+          },
+          { type: 'heading', depth: 1, children: [{ type: 'text', value: 'Title #' }] }
+        ]
+      })
+    ).toBe('1\\. item\n\n# Title \\#\n');
+  });
+
+  test('escapes literal entities in both bare and enclosed destinations', () => {
+    expect(renderInline({ type: 'image', url: '/a?x=&copy;', alt: '*logo* &copy;', title: '&copy;' })).toBe(
+      '![\\*logo\\* \\&copy;](/a?x=\\&copy; "\\&copy;")'
+    );
+    expect(renderInline({ type: 'link', url: '/a b?x=&copy;', children: [{ type: 'text', value: 'Link' }] })).toBe(
+      '[Link](</a%20b?x=\\&copy;>)'
+    );
+  });
+
+  test('escapes long trailing hash runs while preserving interior hashes', () => {
+    const hashes = '#'.repeat(150_000);
+    expect(renderInline({ type: 'text', value: `A # B ${hashes}\t # ` })).toBe(`A # B ${'\\#'.repeat(150_000)}\t \\# `);
+    expect(renderInline({ type: 'text', value: `${hashes} end` })).toBe(`${hashes} end`);
+  });
+
+  test('keeps the explicit YAML renderer and high-level facade equivalent', async () => {
+    const source = await fixture('basic.yaml');
+    // oxlint-disable-next-line typescript/no-deprecated -- Verify the retained YAML string overload.
+    expect(renderYamlMarkdown(source)).toBe(renderMarkdown(source));
+  });
   test('renders a basic fixture exactly', async () => {
     expect(renderYamlMarkdown(await fixture('basic.yaml'))).toBe(await fixture('basic.md'));
   });

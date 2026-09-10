@@ -3,6 +3,34 @@
 All notable changes to Yamdown are recorded here. This project follows
 [Semantic Versioning](https://semver.org/).
 
+## 0.11.0 - 2026-09-09
+
+### Added
+
+- Generic element blocks with names, scalar attributes, and nested blocks;
+  shorthand and verbose forms preserve tags in Markdown, with sorted attributes
+  and escaped values. Exported `ElementNode` and updated the editor schema.
+
+### Fixed
+
+- Escape adjacent structured text together, preserve trailing heading hashes,
+  and prevent literal exclamation marks from turning links into images.
+- Preserve literal entities in destinations and titles, and formatting
+  characters in image alt text.
+- Report unresolved or excessive YAML aliases through the public parse error
+  type and reject circular block content before recursive validation.
+- Allow embedded CLI imports when the caller's entry label is not a file.
+- Avoid the JavaScript argument-count limit when rendering large block arrays.
+- Preserve annotation validation inside elements and separate element closing
+  tags from following region markers so Markdown parsing retains those markers.
+- Reject the reserved element attribute `__proto__` instead of silently dropping it.
+- Keep trailing-hash escaping linear for long structured text values.
+
+### Tests
+
+- Added exact-output and mdast regression tests for structured escaping,
+  shared and circular aliases, and an installed-package CLI import check.
+
 ## 0.10.0 - 2026-08-14
 
 ### Added

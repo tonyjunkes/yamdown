@@ -24,6 +24,40 @@ function expectValidationError(error: unknown): YamdownValidationError {
 }
 
 describe('parseYamlDocument', () => {
+  test('reports unresolved aliases as YAML parse errors', () => {
+    expect(() => parseYamlDocument('blocks: *missing')).toThrow(YamdownYamlParseError);
+    expect(() => parseYamlDocument('blocks: *missing')).toThrow(/Unresolved alias/u);
+  });
+
+  test('retains the YAML alias expansion limit and public error type', () => {
+    const source = `frontmatter:\n  value: &value [a, b]\n  copies: [${Array.from({ length: 101 }, () => '*value').join(', ')}]\nblocks: []`;
+    expect(() => parseYamlDocument(source)).toThrow(YamdownYamlParseError);
+    expect(() => parseYamlDocument(source)).toThrow(/Excessive alias count/u);
+  });
+
+  test('rejects circular block aliases with a source-aware validation error', () => {
+    let caught: unknown;
+    try {
+      parseYamlDocument('blocks: &loop\n  - quote: *loop\n');
+    } catch (error) {
+      caught = error;
+    }
+    expect(expectValidationError(caught).issues[0]).toMatchObject({
+      path: ['blocks', 0, 'quote'],
+      message: 'Cyclic input is not supported',
+      location: { start: { line: 2, column: 12 } }
+    });
+  });
+
+  test('accepts shared aliases without mistaking them for cycles', () => {
+    expect(parseYamlDocument('blocks:\n  - &item {p: Shared}\n  - *item\n')).toEqual({
+      blocks: [
+        { type: 'paragraph', text: 'Shared' },
+        { type: 'paragraph', text: 'Shared' }
+      ]
+    });
+  });
+
   test('parses valid YAML into a normalized document', () => {
     expect(
       parseYamlDocument(`

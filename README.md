@@ -3,327 +3,393 @@
 </p>
 <h1 align="center">Yamdown</h1>
 
-[![CI Build](https://github.com/tonyjunkes/yamdown/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tonyjunkes/yamdown/actions/workflows/ci.yml)
+Author Markdown with structured metadata, or generate it from YAML and JavaScript objects.
 
-Yamdown 0.10 is a Markdown-native structured authoring preview. It adds strict,
-invisible HTML-comment annotations to normal GFM, so a `.yamdown.md` file still
-renders correctly in Markdown tools that do not know Yamdown.
+Yamdown is a TypeScript library and CLI for documents that people read and tools
+need to validate or manipulate. Add stable IDs and metadata to ordinary Markdown
+using HTML comments, or author a complete document as structured YAML. Both paths
+produce Markdown for documentation, READMEs, and other Markdown-based workflows.
 
-Use Markdown when Markdown is the best source format. Use Yamdown annotations
-when a tool needs stable IDs, validated scopes, or structured metadata. YAML
-remains a first-class authoring and interchange format for teams that prefer a
-fully structured document model.
+The Markdown annotation format is a preview. YAML authoring remains supported.
 
-**Markdown in. Clean Markdown out. Structured YAML remains supported.**
+## Contents
 
-```md
----
-title: Welcome
----
+- [Contents](#contents)
+- [Requirements](#requirements)
+- [Supported features](#supported-features)
+- [Installation](#installation)
+- [Usage](#usage)
+  - [Read annotated Markdown](#read-annotated-markdown)
+  - [Generate Markdown from YAML](#generate-markdown-from-yaml)
+  - [Render JavaScript or TypeScript objects](#render-javascript-or-typescript-objects)
+- [Examples](#examples)
+- [API and render options](#api-and-render-options)
+- [CLI](#cli)
+- [Validation and limitations](#validation-and-limitations)
+- [Contributing and testing](#contributing-and-testing)
 
-<!-- yamdown:document {"v":1,"profile":"base"} -->
+## Requirements
 
-<!-- yamdown:node {"id":"welcome","kind":"hero"} -->
+- **Node.js 24.11.0 or later** for the library and CLI.
+- **ES modules** for library imports: use an `.mjs` file or set `"type": "module"`
+  in your project. There is no CommonJS `require` entry point.
+- **pnpm 12.3.4** to build and test the checkout, as pinned in `package.json`.
+  TypeScript is optional for consumers; the package includes type declarations.
+
+## Supported features
+
+| Feature                   | What you can do                                                                                                                         |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Markdown annotations      | Give blocks, inline spans, and nested regions stable IDs and JSON metadata using invisible HTML comments.                               |
+| Profile validation        | Check annotation payloads, unique IDs, placement, and nesting with the built-in `base` profile.                                         |
+| YAML and object authoring | Build documents with headings, paragraphs, nested lists, task lists, blockquotes, tables, code, references, footnotes, and frontmatter. |
+| Inline formatting         | Use explicit text, emphasis, strong, strikethrough, code, link, image, and break nodes.                                                 |
+| Mixed content             | Combine structured nodes with trusted raw Markdown, HTML, and named elements with attributes.                                           |
+| Deterministic rendering   | Generate consistent Markdown with contextual text escaping and configurable list markers, code fences, and spacing.                     |
+| Tool integration          | Use readonly TypeScript types, Zod schemas, a YAML editor schema, source diagnostics, and standard GFM/frontmatter mdast trees.         |
+
+## Installation
+
+Install the library and CLI in your project with npm:
+
+```bash
+npm install yamdown
+```
+
+Run the installed CLI with `npx`:
+
+```bash
+npx yamdown --help
+```
+
+For a global CLI installation:
+
+```bash
+npm install --global yamdown
+yamdown --help
+```
+
+The following library examples run in the project where you installed `yamdown`.
+
+## Usage
+
+### Read annotated Markdown
+
+Choose Markdown input when you want to keep normal Markdown as your source and
+attach metadata to selected content. Save this as `markdown.mjs`:
+
+```js
+import { parseMarkdownDocument, renderMarkdownDocument } from 'yamdown';
+
+const source = `<!-- yamdown:document {"v":1,"profile":"base"} -->
+
+<!-- yamdown:node {"id":"welcome","kind":"intro"} -->
 
 # Welcome
 
-Read the <!-- yamdown:span {"id":"product","kind":"product"} -->Yamdown<!-- yamdown:/span {"id":"product"} --> guide.
+Read the guide.
+`;
+
+const document = parseMarkdownDocument(source);
+process.stdout.write(renderMarkdownDocument(document));
 ```
 
-The normal Markdown projection contains no Yamdown comments:
+Run `node markdown.mjs`. The output omits the recognized Yamdown annotations:
 
 ```md
----
-title: Welcome
----
-
 # Welcome
 
-Read the Yamdown guide.
+Read the guide.
 ```
 
-## Why Yamdown?
+`document.annotations` contains resolved metadata and source ranges;
+`document.root` is a standard `mdast.Root`. Use `serializeMarkdownDocument(document)`
+to produce canonical Markdown that retains annotations, or `document.source` to
+retrieve the exact original source.
 
-- **Portable Markdown source:** ordinary GFM remains ordinary GFM. Yamdown
-  annotations are comments, not a required Markdown extension or executable
-  syntax.
-- **Stable structure:** authored IDs attach metadata to blocks, inline spans,
-  and nested block regions without making visible Markdown less readable.
-- **Strict when requested:** a document profile validates annotation JSON,
-  placement, unique identities, nesting, and source ranges.
-- **Two authoring paths:** author `.yamdown.md` directly, or generate the same
-  portable annotations from typed YAML wrappers.
-- **Deterministic YAML rendering:** structured YAML still provides predictable
-  Markdown, tables, task lists, frontmatter, code fences, and mdast output.
-- **Useful diagnostics:** Yamdown reports typed validation errors with source
-  locations and CLI code frames.
+The document comment opts into strict `base` profile validation. Without it,
+Markdown is unprofiled GFM. Put the comment at the start of the source, immediately
+after YAML frontmatter if present. See the [format reference](FORMAT.md) for
+inline spans, regions, and placement rules.
 
-## Getting started
+### Generate Markdown from YAML
 
-Yamdown requires Node.js 24 or later. The repository pins its pnpm version;
-Corepack is the supported bootstrap path when pnpm is not already installed:
+Choose YAML when your source is structured data. Save this as `yaml.mjs`:
 
-```bash
-corepack enable
-corepack pnpm install --frozen-lockfile
-corepack pnpm run build
-node dist/cli.mjs examples/readme.yaml
+```js
+import { renderYamlMarkdown } from 'yamdown';
+
+const source = `
+blocks:
+  - h1: Hello
+  - p: This is **Markdown** from YAML.
+  - ul:
+      - Validate document data
+      - Generate consistent output
+`;
+
+process.stdout.write(renderYamlMarkdown(source));
 ```
 
-The package is intentionally private. Consume it from a checked-out workspace
-or a local tarball rather than from the public npm registry:
-
-```bash
-# In the Yamdown checkout
-pnpm pack
-
-# In a consumer project; use the tarball name pnpm printed above
-pnpm add /absolute/path/to/yamdown-0.10.0.tgz
-```
-
-## Markdown-native documents
-
-Use `.yamdown.md` for an annotated Markdown document. Plain `.md` is also valid
-when a distinct extension is unnecessary. A document without the document
-annotation is unprofiled GFM. When a document has YAML frontmatter, keep that
-frontmatter at the literal start of the file and put the following annotation
-immediately after it. Without frontmatter, it is the first line. It opts the
-document into the strict built-in profile:
+Run `node yaml.mjs` to print:
 
 ```md
-<!-- yamdown:document {"v":1,"profile":"base"} -->
+# Hello
+
+This is **Markdown** from YAML.
+
+- Validate document data
+- Generate consistent output
 ```
 
-The base profile has three annotation forms:
+A YAML document requires a `blocks` array and can include `frontmatter`. Shorthand
+such as `h1`, `p`, and `ul` expands to validated nodes. The `p` and heading text
+fields accept trusted Markdown; use structured inline `children` for literal text.
 
-| Form                                 | Purpose                                                 |
-| ------------------------------------ | ------------------------------------------------------- |
-| `yamdown:node`                       | Attach metadata to the immediately following block.     |
-| `yamdown:span` / `yamdown:/span`     | Attach metadata to a contiguous inline range.           |
-| `yamdown:region` / `yamdown:/region` | Attach metadata to a nested sequence of sibling blocks. |
+YAML can also emit annotations using a `yamdown` descriptor and the
+`annotatedBlock`, `annotatedSpan`, and `annotatedRegion` wrappers. See the
+[YAML annotation mapping](FORMAT.md#yaml-representation) and
+[YAML authoring reference](FORMAT.md#yaml-authoring-reference).
 
-Every opening annotation has a document-unique `id` and may include a string
-`kind` and JSON `data`. Yamdown validates matching pairs, legal placement, and
-proper nesting. Unrelated HTML comments, raw HTML, and comments inside code are
-preserved as normal Markdown rather than interpreted as annotations.
+### Render JavaScript or TypeScript objects
 
-Read the complete grammar, projection rule, YAML mapping, and compatibility
-rules in [FORMAT.md](FORMAT.md).
+Use `normalizeDocument` to validate unknown data and expand shorthand, then render
+the result. This example runs in an `.mjs` file:
 
-### Markdown API
+```js
+import { normalizeDocument, renderDocument } from 'yamdown';
 
-Use the explicit Markdown APIs for Markdown input. Parsing retains the original
-source, official GFM/frontmatter `mdast`, annotation index, stable IDs, and
-source ranges. Clean rendering removes only recognized Yamdown annotations.
+const document = normalizeDocument({
+  blocks: [
+    { h2: 'Generated report' },
+    {
+      type: 'paragraph',
+      children: [{ type: 'text', value: 'A literal *asterisk* stays literal.' }]
+    }
+  ]
+});
 
-```ts
-import { readFile } from 'node:fs/promises';
-import {
-  parseMarkdownDocument,
-  renderMarkdownDocument,
-  serializeMarkdownDocument,
-  type YamdownMarkdownDocument
-} from 'yamdown';
-
-const source = await readFile('page.yamdown.md', 'utf8');
-const document: YamdownMarkdownDocument = parseMarkdownDocument(source);
-
-const cleanMarkdown = renderMarkdownDocument(document);
-const annotatedSource = serializeMarkdownDocument(document);
-
-document.root; // official mdast.Root
-document.annotations; // resolved annotations and source ranges
+process.stdout.write(renderDocument(document));
 ```
 
-`document.source` retains the original input byte-for-byte for source-aware
-tooling. `serializeMarkdownDocument` produces canonical annotated Markdown;
-the preview does not yet expose a source-preserving editor API.
+For typed canonical objects, use the exported `YamdownDocument` type with explicit
+`type` fields. `YamdownMarkdownDocument` is the separate parsed Markdown type.
 
-The legacy string overloads of `renderMarkdown` and `toMdast` continue to mean
-YAML input through 0.x and are deprecated for new code. Yamdown never
-auto-detects a library string; use the explicit Markdown API instead.
+## Examples
 
-## YAML authoring
+Each example shows the source followed by the Markdown Yamdown produces. Pass
+YAML to `renderYamlMarkdown(source)`, or Markdown to
+`renderMarkdownDocument(parseMarkdownDocument(source))`.
 
-YAML remains useful for generated documents, schema-driven content, and tools
-that want a complete data model. Existing YAML documents work unchanged. Add a
-top-level `yamdown` descriptor and wrappers to emit the portable Markdown
-annotations:
+### Turn data into a table
+
+Define columns once, then supply rows as ordinary records. Column order controls
+the output, regardless of the order of keys in each row.
 
 ```yaml
-yamdown:
-  v: 1
-  profile: base
-frontmatter:
-  title: Welcome
 blocks:
-  - type: annotatedBlock
-    id: welcome
-    kind: hero
-    block:
-      h1: Welcome
+  - table:
+      columns:
+        - { key: name, label: Package }
+        - { key: status, label: Status }
+      rows:
+        - { name: Yamdown, status: Ready }
+        - { name: Website, status: Draft }
+```
+
+```text
+| Package | Status |
+| --- | --- |
+| Yamdown | Ready |
+| Website | Draft |
+```
+
+### Mix structure with familiar Markdown
+
+Use shorthand for headings and lists, and keep existing prose as raw Markdown.
+
+```yaml
+blocks:
+  - h2: Release notes
+  - ul:
+      - Added table support
+      - Improved validation
+  - markdown: |
+      **Next up:** read the [migration guide](https://example.com/migration).
+```
+
+```md
+## Release notes
+
+- Added table support
+- Improved validation
+
+**Next up:** read the [migration guide](https://example.com/migration).
+```
+
+### Keep generated text literal
+
+Structured `text` nodes escape Markdown punctuation. A value from a form or data
+source stays literal instead of accidentally becoming formatting.
+
+```yaml
+blocks:
   - type: paragraph
     children:
       - type: text
-        value: 'Read the '
-      - type: annotatedSpan
-        id: product
-        kind: product
-        children:
-          - type: text
-            value: Yamdown
-      - type: text
-        value: guide.
-  - type: annotatedRegion
-    id: next-steps
-    kind: section
-    blocks:
-      - h2: Next steps
-      - p: Keep authoring in familiar Markdown.
+        value: 'Use *stars* to mark a favorite.'
 ```
 
-`annotatedBlock` renders one node comment before `block`; `annotatedSpan` and
-`annotatedRegion` render matching opening and closing comments around their
-children or blocks. Raw `markdown` values remain trusted, opaque content—use
-the wrappers instead of embedding annotation comments in raw strings.
-
-For ordinary YAML content, compact shorthand remains available:
-
-```yaml
-frontmatter:
-  title: Yamdown Example
-blocks:
-  - h1: Yamdown Example
-  - p: Structured YAML in. **Clean Markdown out.**
-  - ul:
-      - Validate predictable document shapes
-      - Update structured content safely
-  - markdown: |
-      ## Existing content
-
-      Raw blocks preserve **normal Markdown** without parsing it.
+```md
+Use \*stars\* to mark a favorite.
 ```
 
-This checked-in source renders byte-for-byte to
-[examples/readme.md](examples/readme.md). Raw Markdown and HTML are intentionally
-trusted and are not sanitized. Structured inline text is contextually escaped,
-but applications must enforce their own URL and HTML trust boundaries.
+The reader sees `Use *stars* to mark a favorite.` with literal asterisks.
 
-### YAML API and mdast
+### Attach metadata without changing the prose
 
-```ts
-import { documentToMdast, parseYamlDocument, renderYamlMarkdown, type YamdownDocument } from 'yamdown';
+An inline span gives a phrase an ID and metadata that tools can inspect through
+`document.annotations`. Clean rendering removes the annotation comments.
 
-const yaml = `
-blocks:
-  - h2: API example
-`;
+```md
+<!-- yamdown:document {"v":1,"profile":"base"} -->
 
-const document: YamdownDocument = parseYamlDocument(yaml);
-const markdown = renderYamlMarkdown(yaml);
-const tree = documentToMdast(document);
+Try the <!-- yamdown:span {"id":"plan","data":{"tier":"pro"}} -->Pro plan<!-- yamdown:/span {"id":"plan"} --> today.
 ```
 
-`documentToMdast` renders Yamdown and parses that exact Markdown using the
-official mdast parser with GFM and YAML-frontmatter support. Its positions refer
-to generated Markdown, not the YAML input.
-
-Yamdown supports structured headings, paragraphs, lists, blockquotes, tables,
-code, HTML, references, footnotes, and structured inline content. See
-[FORMAT.md](FORMAT.md) for annotations and the source types exported by the
-package for the full YAML model.
-
-### Editor schema
-
-Yamdown ships a Draft 2020-12 JSON Schema for YAML-aware editors. It validates
-the pre-normalization authoring shape, including YAML shorthand and annotation
-wrappers. Document-wide reference integrity and some rendering constraints are
-runtime checks, so editor validation is an early signal rather than a complete
-substitute for `yamdown --check`.
-
-When installed from a workspace or tarball, the stable schema path is:
-
-```text
-node_modules/yamdown/schema/yamdown.schema.json
+```md
+Try the Pro plan today.
 ```
 
-Tools that resolve package exports can import the same JSON with an import
-attribute:
+## API and render options
 
-```ts
-import schema from 'yamdown/schema.json' with { type: 'json' };
-```
+Use explicit APIs for each input format. Library strings are never auto-detected.
 
-For the VS Code YAML language server:
+| Input or task                                                       | API                                    |
+| ------------------------------------------------------------------- | -------------------------------------- |
+| Parse and validate Markdown annotations                             | `parseMarkdownDocument(source)`        |
+| Parse Markdown to a GFM/frontmatter tree without profile validation | `parseMarkdownRoot(source)`            |
+| Render clean Markdown from a parsed Markdown document               | `renderMarkdownDocument(document)`     |
+| Serialize canonical Markdown with annotations retained              | `serializeMarkdownDocument(document)`  |
+| Parse, normalize, and validate YAML                                 | `parseYamlDocument(source)`            |
+| Render YAML directly                                                | `renderYamlMarkdown(source, options?)` |
+| Validate an unknown object and expand shorthand                     | `normalizeDocument(value)`             |
+| Render a validated YAML/object document                             | `renderDocument(document, options?)`   |
+| Convert a YAML/object document to mdast                             | `documentToMdast(document, options?)`  |
 
-```json
-{
-  "yaml.schemas": {
-    "./node_modules/yamdown/schema/yamdown.schema.json": ["yamdown*.yaml", "*.yamdown.yaml"]
-  }
-}
-```
+`parseYamlDocument` already normalizes and validates; it does not need another
+`normalizeDocument` call. `renderDocument` expects validated input. Lower-level
+`renderBlock` and `renderInline` exports render individual nodes.
 
-The CLI can also print the committed schema:
+The legacy string overloads of `renderMarkdown` and `toMdast` mean **YAML input**
+through 0.x and are deprecated for new code. Use the explicit APIs above.
 
-```bash
-yamdown --schema > yamdown.schema.json
-```
+YAML/object renderers accept these options; Markdown parsing and serialization
+use their own canonical formatting:
+
+| Option             | Values                | Default  |
+| ------------------ | --------------------- | -------- |
+| `frontmatter`      | `boolean`             | `true`   |
+| `bullet`           | `-`, `*`, `+`         | `-`      |
+| `orderedDelimiter` | `.`, `)`              | `.`      |
+| `codeFence`        | Backtick or tilde     | Backtick |
+| `blankLines`       | Positive safe integer | `1`      |
+
+`documentToMdast` parses the exact generated Markdown with GFM and frontmatter
+support. Its source positions refer to that Markdown, not the original YAML.
+Markdown-input trees refer to the Markdown source. GFM parsing can turn URL-like
+text into links, including text authored with structured nodes.
 
 ## CLI
 
-```text
-yamdown [input] [options]
-
---input-format <yaml|markdown>  Select source format when the path is ambiguous
--o, --output <file>             Write Markdown to a file
---check                          Validate without rendering Markdown
---schema                         Print the Yamdown YAML authoring JSON Schema
---version                        Print the installed package version
---debug                          Include stack traces for unexpected errors
-```
-
-The CLI recognizes `.yaml`, `.yml`, and `.yamdown.md` paths. Use
-`--input-format` for stdin (`-`) and ambiguous extensions; it never
-content-sniffs input.
+Use `npx yamdown` in a project where the package is installed, or `yamdown` after
+a global installation. Replace the input filenames below with your own files.
 
 ```bash
-yamdown document.yaml
-yamdown document.yamdown.md -o README.md
-yamdown --check document.yamdown.md
-yamdown --input-format markdown - < document.md
-yamdown --schema
+npx yamdown input.yaml -o output.md
+npx yamdown input.yaml --check
+npx yamdown input.md --input-format markdown
+npx yamdown --help
 ```
 
-Without `--output`, rendered Markdown goes to stdout. Errors go to stderr and
-return a non-zero exit status. `--schema` does not read an input file and cannot
-be combined with an input path, `--check`, or `--output`.
+| Option                                             | Purpose                                               |
+| -------------------------------------------------- | ----------------------------------------------------- |
+| `--input-format yaml` or `--input-format markdown` | Select the input format explicitly.                   |
+| `-o, --output <file>`                              | Write Markdown to a file, replacing an existing file. |
+| `--check`                                          | Validate without producing Markdown.                  |
+| `--schema`                                         | Print the YAML authoring JSON Schema.                 |
+| `--version`                                        | Print the installed version.                          |
+| `--debug`                                          | Include stack traces for unexpected errors.           |
+| `-h, --help`                                       | Display usage and options.                            |
 
-## Development
+The CLI recognizes `.yaml`, `.yml`, and `.yamdown.md` filenames. Plain `.md`, other
+extensions, and stdin (`-`) require `--input-format`; it never inspects file
+contents to guess a format. To read stdin, pipe text to
+`npx yamdown --input-format markdown -`.
+
+Markdown input produces clean Markdown with recognized annotations removed. YAML
+input produces deterministic Markdown, including annotations when wrappers are
+present. Output goes to stdout unless `--output` is set; output directories must
+already exist. Errors go to stderr and return a nonzero exit status. Successful
+conversion or validation exits with `0`.
+
+`--schema` cannot be combined with an input, `--input-format`, `--check`, or
+`--output`. See [Editor schema](FORMAT.md#editor-schema) for YAML editor setup.
+
+## Validation and limitations
+
+The library exports `YamdownYamlParseError`, `YamdownValidationError`, and
+`YamdownRenderError`, all derived from `YamdownError`. Validation issues include
+paths and, where available, source ranges. Lines and columns are one-based;
+character offsets are zero-based and range ends are exclusive. The CLI displays
+source locations and code frames for parse and validation failures.
+
+For direct Zod validation, `yamdownSourceDocumentSchema` checks authoring shapes
+and `yamdownDocumentSchema` checks canonical documents. The editor JSON Schema
+covers authoring shapes; runtime validation also checks document-wide constraints.
+
+Raw Markdown, heading and paragraph `text`, and HTML are trusted and are not
+sanitized. Structured text is escaped for Markdown, but Yamdown does not validate
+URL schemes or sanitize rendered HTML. Applications must apply their own trust
+rules. Named elements retain their tags; Markdown viewers may interpret them
+according to HTML parsing rules.
+The reserved element attribute name `__proto__` is rejected during validation.
+
+The annotation format remains a preview. There is no source-preserving editing
+API, custom profile support, MDX, plugin execution, remote-file loading, or CLI
+watch mode. Canonical serialization can change source formatting; use
+`document.source` when you need the original Markdown.
+
+## Contributing and testing
+
+With the required Node.js and pnpm installed, set up a checkout and validate it:
 
 ```bash
-pnpm run typecheck       # TypeScript validation
-pnpm run lint            # oxlint checks
-pnpm run fmt:check       # formatting check
-pnpm run test            # Vitest suite
-pnpm run build           # package build
-pnpm run schema:generate # rebuild the committed editor schema
-pnpm run schema:check    # verify the committed schema matches the build
-pnpm run test:package    # install and exercise a local tarball
-pnpm run pack:check      # inspect package contents without publishing
-pnpm run check           # complete validation pipeline
+git clone https://github.com/tonyjunkes/yamdown.git
+cd yamdown
+pnpm install --frozen-lockfile
+pnpm run check
 ```
 
-The package `prepack` hook builds and checks the schema before a tarball is
-created. CI runs source tests and installed-tarball/package checks on the
-Node 24 minimum and the latest Node release; coverage is collected once
-on the latest Node 24 release.
+This runs typechecking, linting, formatting checks, tests, the build/schema check,
+and the installed-package smoke test. For individual tasks:
 
-## Preview boundaries
+| Command                              | Purpose                                          |
+| ------------------------------------ | ------------------------------------------------ |
+| `pnpm run test tests/render.test.ts` | Run targeted rendering tests.                    |
+| `pnpm run test:watch`                | Re-run tests while editing.                      |
+| `pnpm run test:coverage`             | Run tests with coverage.                         |
+| `pnpm run fmt:check`                 | Check formatting.                                |
+| `pnpm run schema:generate`           | Regenerate the schema after input-shape changes. |
+| `pnpm run schema:check`              | Build and verify the committed schema.           |
+| `pnpm run test:package`              | Install and exercise a local tarball.            |
+| `pnpm run pack:check`                | Inspect package contents without publishing.     |
 
-0.10 is a format preview. Yamdown does not sanitize Markdown or HTML, support
-MDX, execute plugins, load remote files, or include a watch mode. It preserves
-the original source on parsed Markdown documents, but source-preserving editing
-and arbitrary custom profiles are future work. `:::directive` syntax is also
-not a source format; a future controlled toolchain may compile directives into
-portable Yamdown comments.
+Include tests for behavior changes. Markdown output is a byte-for-byte contract;
+update fixture pairs for intentional output changes and keep types, schemas,
+normalization, rendering, and examples in sync. For documentation changes, check
+formatting and verify commands, links, and examples. CI also runs coverage on Node 24.
+
+See the [changelog](CHANGELOG.md) for version history. Report bugs or propose
+features through [GitHub issues](https://github.com/tonyjunkes/yamdown/issues),
+including a minimal input and expected output when reporting a bug.

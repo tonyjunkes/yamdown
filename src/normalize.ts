@@ -1,4 +1,4 @@
-import { formatPath, YamdownValidationError, validationErrorFromZodIssues } from './errors.js';
+import { validationErrorFromZodIssues } from './errors.js';
 import { sourceDocumentSchema, yamdownDocumentSchema } from './schema.js';
 import type { BlockNode, ListItemNode, YamdownDocument } from './types.js';
 import type { SourceRange } from './errors.js';
@@ -38,6 +38,41 @@ export function normalizeDocumentWithSourceLocations(
   return result.data;
 }
 
+function assertAcyclic(input: unknown, locate?: (path: DocumentPath) => SourceRange | undefined): void {
+  const active = new WeakSet();
+  const visited = new WeakSet();
+  const pending: { value: unknown; path: DocumentPath; exit?: boolean }[] = [{ value: input, path: [] }];
+
+  while (pending.length > 0) {
+    const entry = pending.pop();
+    if (entry === undefined || typeof entry.value !== 'object' || entry.value === null) {
+      continue;
+    }
+    const { value, path } = entry;
+    if (entry.exit === true) {
+      active.delete(value);
+      continue;
+    }
+    if (active.has(value)) {
+      throw validationErrorFromZodIssues(
+        [{ code: 'custom', message: 'Cyclic input is not supported', path: [...path] }],
+        locate
+      );
+    }
+    if (visited.has(value)) {
+      continue;
+    }
+    visited.add(value);
+    active.add(value);
+    pending.push({ value, path, exit: true });
+    for (const [key, child] of Object.entries(value)) {
+      if (typeof child === 'object' && child !== null) {
+        pending.push({ value: child, path: [...path, Array.isArray(value) ? Number(key) : key] });
+      }
+    }
+  }
+}
+
 function normalizeDocumentShape(input: unknown, context: NormalizationContext): unknown {
   if (!isRecord(input)) {
     return input;
@@ -64,6 +99,12 @@ function normalizeBlock(
   }
 
   recordOrigin(context, normalizedPath, sourcePath);
+
+  if (Object.hasOwn(input, 'element') && isRecord(input.element)) {
+    const elementPath = [...sourcePath, 'element'];
+    recordOrigin(context, normalizedPath, elementPath);
+    return normalizeVerboseBlock({ type: 'element', ...input.element }, context, normalizedPath, elementPath);
+  }
 
   const headingKey = shorthandHeadings.find((key) => Object.hasOwn(input, key));
   if (headingKey !== undefined) {
@@ -192,6 +233,7 @@ function normalizeVerboseBlock(
         items: normalizeListItems(input.items, context, [...normalizedPath, 'items'], [...sourcePath, 'items'])
       };
     case 'blockquote':
+    case 'element':
       return {
         ...input,
         blocks: Array.isArray(input.blocks)
@@ -309,43 +351,4 @@ export function resolveOrigin(origins: ReadonlyMap<string, DocumentPath>, path: 
   }
 
   return path;
-}
-
-function assertAcyclic(input: unknown, locate?: (path: DocumentPath) => SourceRange | undefined): void {
-  const ancestors = new WeakSet();
-
-  const visit = (value: unknown, path: DocumentPath): void => {
-    if (typeof value !== 'object' || value === null) {
-      return;
-    }
-
-    if (ancestors.has(value)) {
-      const location = locate?.(path);
-      throw new YamdownValidationError(
-        `Invalid Yamdown document at ${formatPath(path)}: Cyclic input is not supported`,
-        [
-          {
-            code: 'custom',
-            location,
-            message: 'Cyclic input is not supported',
-            path
-          }
-        ]
-      );
-    }
-
-    ancestors.add(value);
-    if (Array.isArray(value)) {
-      for (const [index, item] of value.entries()) {
-        visit(item, [...path, index]);
-      }
-    } else if (isRecord(value)) {
-      for (const key of Object.keys(value)) {
-        visit(value[key], [...path, key]);
-      }
-    }
-    ancestors.delete(value);
-  };
-
-  visit(input, []);
 }

@@ -8,6 +8,7 @@ import type {
   CodeNode,
   DefinitionNode,
   DocumentNode,
+  ElementNode,
   FootnoteDefinitionNode,
   InlineNode,
   ListItemNode,
@@ -52,7 +53,9 @@ export function renderDocument(document: YamdownDocument, options: Readonly<Rend
     parts.push(renderDocumentAnnotation(document.yamdown));
   }
 
-  parts.push(...document.blocks.map((block) => renderBlockWithOptions(block, renderOptions)));
+  for (const block of document.blocks) {
+    parts.push(renderBlockWithOptions(block, renderOptions));
+  }
 
   const separator = createBlockSeparator(renderOptions);
   return `${trimTrailingLineEndings(parts.filter((part) => part.length > 0).join(separator))}\n`;
@@ -71,7 +74,7 @@ function renderBlockWithOptions(block: DocumentNode, options: ResolvedRenderOpti
       return joinAnnotationParts(
         renderRegionAnnotation(block),
         renderBlocks(block.blocks, options),
-        renderAnnotationClose('region', block.id)
+        `${endsWithElement(block.blocks) ? '\n' : ''}${renderAnnotationClose('region', block.id)}`
       );
     case 'heading':
       return `${'#'.repeat(block.depth)} ${'text' in block ? block.text : renderInlineChildren(block.children, false)}`;
@@ -91,6 +94,8 @@ function renderBlockWithOptions(block: DocumentNode, options: ResolvedRenderOpti
       return renderTable(block);
     case 'html':
       return block.value.trimEnd();
+    case 'element':
+      return renderElement(block, options);
     case 'definition':
       return renderDefinition(block);
     case 'footnoteDefinition':
@@ -149,6 +154,33 @@ function renderParagraph(node: ParagraphNode): string {
   return 'text' in node ? node.text : renderInlineChildren(node.children);
 }
 
+function renderElement(node: ElementNode, options: ResolvedRenderOptions): string {
+  const attrs = Object.entries(node.attrs ?? {})
+    .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+    .map(([name, value]) => ` ${name}="${escapeAttribute(String(value))}"`)
+    .join('');
+  const body = renderBlocks(node.blocks, options);
+  const separator = createBlockSeparator(options);
+  return [`<${node.name}${attrs}>`, body, `</${node.name}>`].filter((part) => part.length > 0).join(separator);
+}
+
+function endsWithElement(blocks: readonly BlockNode[]): boolean {
+  const last = blocks.at(-1);
+  // A blank line ends the closing tag's HTML block before the region marker.
+  return last?.type === 'element' || (last?.type === 'annotatedBlock' && last.block.type === 'element');
+}
+
+function escapeAttribute(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('"', '&quot;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('\t', '&#9;')
+    .replaceAll('\n', '&#10;')
+    .replaceAll('\r', '&#13;');
+}
+
 function renderRawMarkdown(value: string): string {
   const normalized = value.replaceAll(/\r\n?/gu, '\n');
   if (/^[\t ]*$/u.test(normalized)) {
@@ -167,9 +199,21 @@ function renderInlineChildren(
   const output: string[] = [];
 
   for (let index = 0; index < children.length; index += 1) {
-    const child = children[index];
+    let child = children[index];
     if (child === undefined) {
       continue;
+    }
+
+    // Adjacent text is one run, so node boundaries cannot introduce Markdown syntax.
+    if (child.type === 'text') {
+      const values = [child.value];
+      let next = children[index + 1];
+      while (next?.type === 'text') {
+        values.push(next.value);
+        index += 1;
+        next = children[index + 1];
+      }
+      child = { type: 'text', value: values.join('') };
     }
 
     if (child.type === 'delete') {
@@ -226,7 +270,9 @@ function renderInlineChildren(
 
     const rendered = renderInlineWithContext(child, atLineStart, parentDelimiter);
     output.push(rendered);
-    atLineStart = rendered.endsWith('\n');
+    if (rendered.length > 0) {
+      atLineStart = rendered.endsWith('\n');
+    }
   }
 
   return output.join('');
@@ -562,12 +608,7 @@ function renderTitle(title: string | undefined): string {
 }
 
 function escapeAltText(value: string): string {
-  return value
-    .replaceAll('\\', '\\\\')
-    .replaceAll('[', '\\[')
-    .replaceAll(']', '\\]')
-    .replaceAll('&', '\\&')
-    .replaceAll(/\r\n?|\n/gu, ' ');
+  return escapeStructuredText(value.replaceAll(/\r\n?|\n/gu, ' '), false);
 }
 
 function renderDestination(value: string): string {
@@ -589,10 +630,22 @@ function escapeStructuredText(value: string, initiallyAtLineStart: boolean): str
   return lines
     .map((line, index) => {
       const atLineStart = index > 0 || initiallyAtLineStart;
-      const escapedLine = line.replaceAll(/\\|`|\*|_|~|\[|\]|<|>|&/gu, '\\$&');
+      const escapedLine = escapeClosingHashes(line.replaceAll(/\\|`|\*|_|~|\[|\]|<|>|&|!/gu, '\\$&'));
       return atLineStart ? escapeBlockMarker(escapedLine) : escapedLine;
     })
     .join('\n');
+}
+
+function escapeClosingHashes(line: string): string {
+  let start = line.length;
+  while (start > 0) {
+    const character = line[start - 1];
+    if (character !== '#' && character !== '\t' && character !== ' ') {
+      break;
+    }
+    start -= 1;
+  }
+  return line.slice(0, start) + line.slice(start).replaceAll('#', '\\#');
 }
 
 function isUnsafeDestinationCharacter(character: string): boolean {

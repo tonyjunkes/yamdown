@@ -20,7 +20,17 @@ export function parseYamlDocument(input: string): YamdownDocument {
     );
   }
 
-  return normalizeDocumentWithSourceLocations(document.toJS(), (path) => {
+  let value: unknown;
+  try {
+    value = document.toJS();
+  } catch (error) {
+    if (error instanceof ReferenceError) {
+      throw new YamdownYamlParseError(error.message);
+    }
+    throw error;
+  }
+
+  return normalizeDocumentWithSourceLocations(value, (path) => {
     for (let length = path.length; length >= 0; length -= 1) {
       const node = document.getIn(path.slice(0, length), true);
       if (isNode(node) && node.range !== undefined && node.range !== null) {

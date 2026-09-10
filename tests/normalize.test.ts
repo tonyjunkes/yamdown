@@ -3,6 +3,19 @@ import { YamdownValidationError, normalizeDocument } from '../src/index.js';
 import { resolveOrigin } from '../src/normalize.js';
 
 describe('normalizeDocument', () => {
+  test('rejects cycles in frontmatter as well as block content', () => {
+    const frontmatter: Record<string, unknown> = {};
+    frontmatter.self = frontmatter;
+    expect(() => normalizeDocument({ frontmatter, blocks: [] })).toThrow(/Cyclic input is not supported/u);
+  });
+  test('rejects cyclic JavaScript block content without rejecting shared values', () => {
+    const blocks: unknown[] = [];
+    blocks.push({ quote: blocks });
+    expect(() => normalizeDocument({ blocks })).toThrow(YamdownValidationError);
+    const shared = { p: 'Shared' };
+    expect(normalizeDocument({ blocks: [shared, shared] }).blocks).toHaveLength(2);
+  });
+
   test('resolves source origins by nearest parent and falls back to the canonical path', () => {
     const origins = new Map([[JSON.stringify(['blocks', 0]), ['blocks', 0, 'quote']]]);
 

@@ -8,6 +8,74 @@ import { describe, expect, test } from 'vitest';
 import { documentToMdast, parseYamlDocument, renderYamlMarkdown, toMdast } from '../src/index.js';
 
 describe('toMdast', () => {
+  test.each([
+    ['', '# heading'],
+    ['1', '. item'],
+    [' ', '   indented']
+  ])('keeps adjacent structured text literal: %j', (...values) => {
+    expect(
+      toMdast({ blocks: [{ type: 'paragraph', children: values.map((value) => ({ type: 'text' as const, value })) }] })
+        .children
+    ).toMatchObject([{ type: 'paragraph', children: [{ type: 'text', value: values.join('') }] }]);
+  });
+
+  test('keeps punctuation from changing adjacent links or closing headings', () => {
+    expect(
+      toMdast({
+        blocks: [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'text', value: '!' },
+              { type: 'link', url: '/docs', children: [{ type: 'text', value: 'Docs' }] }
+            ]
+          },
+          { type: 'heading', depth: 1, children: [{ type: 'text', value: 'Title #' }] }
+        ]
+      }).children
+    ).toMatchObject([
+      {
+        type: 'paragraph',
+        children: [
+          { type: 'text', value: '!' },
+          { type: 'link', url: '/docs' }
+        ]
+      },
+      { type: 'heading', depth: 1, children: [{ type: 'text', value: 'Title #' }] }
+    ]);
+  });
+
+  test('preserves literal entities and formatting characters in link and image fields', () => {
+    const url = '/search?q=&copy;';
+    const title = 'A &copy; title';
+    const alt = '*logo* `code` ~~old~~ &copy; <tag>';
+    expect(
+      toMdast({
+        blocks: [
+          {
+            type: 'paragraph',
+            children: [
+              { type: 'link', url, title, children: [{ type: 'text', value: 'Link' }] },
+              { type: 'image', url, title, alt },
+              { type: 'imageReference', identifier: 'logo', alt }
+            ]
+          },
+          { type: 'definition', identifier: 'logo', url, title }
+        ]
+      }).children
+    ).toMatchObject([
+      {
+        type: 'paragraph',
+        children: [
+          { type: 'link', url, title },
+          { type: 'image', url, title, alt },
+          { type: 'imageReference', alt }
+        ]
+      },
+      { type: 'definition', url, title }
+    ]);
+  });
+
   test('keeps the document-only and high-level mdast APIs equivalent', () => {
     const document = { blocks: [{ type: 'paragraph' as const, text: 'Hello' }] };
     expect(documentToMdast(document)).toEqual(toMdast(document));

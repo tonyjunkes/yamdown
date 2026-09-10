@@ -1,41 +1,152 @@
-name: Package dry run
+name: Release
 
 env:
   NODE_VERSION: 24
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: package-dry-run-${{ github.workflow }}-${{ github.ref }}
+  group: release
   cancel-in-progress: false
 
 jobs:
-  package:
-    name: Validate package contents
+  validate:
+    name: Validate release
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Setup pnpm
+      - &setup_pnpm_step
+        name: Setup pnpm
         uses: pnpm/action-setup@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: Install dependencies
+      - &install_dependencies_step
+        name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Validate package
         run: pnpm run check
 
+      - name: Check coverage thresholds
+        run: pnpm run test:coverage
+
       - name: Inspect package contents
         run: pnpm run pack:check
+
+  publish:
+    name: Tag, publish, and create release
+    needs: validate
+    # Validate private repositories without publishing their contents to npm.
+    if: github.event.repository.private == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - *setup_pnpm_step
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - *install_dependencies_step
+
+      - name: Check version and existing publication
+        id: version
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { execFileSync } from 'node:child_process';
+          import { appendFileSync, readFileSync } from 'node:fs';
+
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          if (pkg.private) throw new Error('The package must not be private.');
+          const tag = `v${pkg.version}`;
+          execFileSync('git', ['check-ref-format', `refs/tags/${tag}`]);
+          const tags = execFileSync('git', ['tag', '--list', tag], { encoding: 'utf8' }).trim();
+          const tagExists = tags === tag;
+          const tagCommit = tagExists
+            ? execFileSync('git', ['rev-list', '-n', '1', tag], { encoding: 'utf8' }).trim()
+            : undefined;
+          const response = await fetch(
+            `https://registry.npmjs.org/${encodeURIComponent(pkg.name)}/${encodeURIComponent(pkg.version)}`,
+            { signal: AbortSignal.timeout(30_000) }
+          );
+          let publish = true;
+          if (response.ok) {
+            const published = await response.json();
+            if (!tagExists || published.gitHead !== tagCommit) {
+              throw new Error('The npm version does not match its git tag. Bump package.json to a new version.');
+            }
+            publish = false;
+          } else if (response.status !== 404) {
+            throw new Error(`npm registry lookup failed: HTTP ${response.status}`);
+          } else if (tagExists && tagCommit !== process.env.GITHUB_SHA) {
+            throw new Error('The version tag points to another commit. Rerun that release or bump the version.');
+          }
+
+          appendFileSync(process.env.GITHUB_OUTPUT, [
+            `tag=${tag}`,
+            `tag_exists=${tagExists}`,
+            `publish=${publish}`,
+            `prerelease=${pkg.version.includes('-')}`,
+            ''
+          ].join('\n'));
+          NODE
+
+      - name: Tag version
+        if: steps.version.outputs.tag_exists == 'false'
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -a "$RELEASE_TAG" "$GITHUB_SHA" -m "$RELEASE_TAG"
+          git push origin "refs/tags/$RELEASE_TAG"
+
+      - name: Publish to npm
+        if: steps.version.outputs.publish == 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          dist_tag=latest
+          if [[ "$PRERELEASE" == 'true' ]]; then dist_tag=next; fi
+          npm publish --access public --provenance --tag "$dist_tag"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists."
+          else
+            flags=()
+            if [[ "$PRERELEASE" == 'true' ]]; then flags+=(--prerelease); fi
+            gh release create "$RELEASE_TAG" --verify-tag --generate-notes "${flags[@]}"
+          fi

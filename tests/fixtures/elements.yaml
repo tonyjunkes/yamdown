@@ -1,0 +1,18 @@
+blocks:
+  - element:
+      name: task
+      attrs:
+        priority: high
+        id: garden-brief
+      blocks:
+        - element:
+            name: instructions
+            blocks:
+              - p: Summarize the planting plan in three bullets.
+        - element:
+            name: document
+            attrs:
+              source: harbor-garden-notes.txt
+            blocks:
+              - h1: Harbor Garden Plan
+              - p: Plant the rosemary beside the east fence.
