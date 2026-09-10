@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tonyjunkes/yamdown/main/images/yamdown.png" alt="Yamdown" />
+  <img src="./images/yamdown.png" alt="Yamdown" />
 </p>
 <h1 align="center">Yamdown</h1>
 
@@ -23,6 +23,10 @@ The Markdown annotation format is a preview. YAML authoring remains supported.
   - [Generate Markdown from YAML](#generate-markdown-from-yaml)
   - [Render JavaScript or TypeScript objects](#render-javascript-or-typescript-objects)
 - [Examples](#examples)
+  - [Turn data into a table](#turn-data-into-a-table)
+  - [Mix structure with familiar Markdown](#mix-structure-with-familiar-markdown)
+  - [Keep generated text literal](#keep-generated-text-literal)
+  - [Attach metadata without changing the prose](#attach-metadata-without-changing-the-prose)
 - [API and render options](#api-and-render-options)
 - [CLI](#cli)
 - [Validation and limitations](#validation-and-limitations)
