@@ -29,7 +29,7 @@ interface CliIO {
 const DEFAULT_IO: CliIO = { stderr: process.stderr, stdout: process.stdout };
 // Keep this in sync with package.json. The bundled CLI cannot read the source
 // package manifest once it has been installed from a tarball.
-const VERSION = '0.11.2';
+const VERSION = '0.11.3';
 
 export async function runCli(argv: readonly string[] = process.argv, io: CliIO = DEFAULT_IO): Promise<number> {
   const program = new Command();

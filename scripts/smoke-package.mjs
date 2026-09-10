@@ -10,6 +10,15 @@ const execFileAsync = promisify(execFile);
 const root = dirname(import.meta.dirname);
 const temporaryDirectory = await mkdtemp(join(tmpdir(), 'yamdown-package-'));
 const consumerDirectory = join(temporaryDirectory, 'consumer');
+/** @type {unknown} */
+const sourcePackageManifest = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'));
+
+if (!isPackageManifest(sourcePackageManifest)) {
+  throw new TypeError('Source package manifest has no name or version.');
+}
+
+const packageName = sourcePackageManifest.name;
+const packageNameLiteral = JSON.stringify(packageName);
 const pnpmCli = process.env.npm_execpath;
 
 if (pnpmCli === undefined) {
@@ -36,7 +45,7 @@ try {
 
   await runPnpm(['add', '--ignore-scripts', tarball], consumerDirectory);
 
-  const installedPackageDirectory = join(consumerDirectory, 'node_modules', 'yamdown');
+  const installedPackageDirectory = join(consumerDirectory, 'node_modules', ...packageName.split('/'));
   const expectedPackageEntries = [
     'dist/index.mjs',
     'dist/cli.mjs',
@@ -73,7 +82,7 @@ try {
       '  renderMarkdownDocument,',
       '  serializeMarkdownDocument,',
       '  type YamdownMarkdownDocument',
-      "} from 'yamdown';",
+      `} from ${packageNameLiteral};`,
       '',
       "const markdownDocument: YamdownMarkdownDocument = parseMarkdownDocument('# Type consumer\\n');",
       'const cleanMarkdown: string = renderMarkdownDocument(markdownDocument);',
@@ -106,8 +115,8 @@ try {
       '--input-type=module',
       '--eval',
       [
-        "import { documentToMdast, parseMarkdownDocument, parseYamlDocument, renderMarkdown, renderMarkdownDocument, renderYamlMarkdown, serializeMarkdownDocument, toMdast } from 'yamdown';",
-        "import * as yamdown from 'yamdown';",
+        `import { documentToMdast, parseMarkdownDocument, parseYamlDocument, renderMarkdown, renderMarkdownDocument, renderYamlMarkdown, serializeMarkdownDocument, toMdast } from ${packageNameLiteral};`,
+        `import * as yamdown from ${packageNameLiteral};`,
         "for (const oldName of ['parseYamlMarkdown', 'YamlMarkdownError', 'YamlMarkdownParseError', 'YamlMarkdownRenderError', 'YamlMarkdownValidationError', 'yamlMarkdownDocumentSchema', 'yamlMarkdownSourceDocumentSchema']) if (oldName in yamdown) throw new Error(`Unexpected transitional export: ${oldName}`);",
         "const rendered = renderMarkdown({ blocks: [{ type: 'paragraph', children: [{ type: 'text', value: '**literal**' }] }] });",
         "if (rendered !== '\\\\*\\\\*literal\\\\*\\\\*\\n') throw new Error(`Unexpected library output: ${JSON.stringify(rendered)}`);",
@@ -141,7 +150,7 @@ try {
     [
       '--input-type=module',
       '--eval',
-      "process.argv[1] = 'nonexistent-embedded-entry'; await import('./node_modules/yamdown/dist/cli.mjs');"
+      `process.argv[1] = 'nonexistent-embedded-entry'; await import('./node_modules/${packageName}/dist/cli.mjs');`
     ],
     consumerDirectory
   );
@@ -192,7 +201,7 @@ try {
       '--input-type=module',
       '--eval',
       [
-        "const schemaUrl = import.meta.resolve('yamdown/schema.json');",
+        `const schemaUrl = import.meta.resolve(${packageNameLiteral} + '/schema.json');`,
         'const schema = await import(schemaUrl, { with: { type: "json" } });',
         "if (schema.default?.title !== 'Yamdown authoring document') throw new Error('Schema export failed');"
       ].join('\n')
@@ -252,10 +261,17 @@ function runTypeScriptCheck(cwd) {
 
 /**
  * @param {unknown} value parsed package manifest
- * @returns {value is { version: string }} true when the package manifest has a version
+ * @returns {value is { name: string, version: string }} true when the package manifest has a name and version
  */
 function isPackageManifest(value) {
-  return typeof value === 'object' && value !== null && 'version' in value && typeof value.version === 'string';
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'name' in value &&
+    typeof value.name === 'string' &&
+    'version' in value &&
+    typeof value.version === 'string'
+  );
 }
 
 /**
