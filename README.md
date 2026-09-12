@@ -23,6 +23,8 @@ The Markdown annotation format is a preview. YAML authoring remains supported.
   - [Generate Markdown from YAML](#generate-markdown-from-yaml)
   - [Render JavaScript or TypeScript objects](#render-javascript-or-typescript-objects)
 - [Examples](#examples)
+  - [Group content with named elements](#group-content-with-named-elements)
+  - [Generate a release checklist](#generate-a-release-checklist)
   - [Turn data into a table](#turn-data-into-a-table)
   - [Mix structure with familiar Markdown](#mix-structure-with-familiar-markdown)
   - [Keep generated text literal](#keep-generated-text-literal)
@@ -184,6 +186,79 @@ For typed canonical objects, use the exported `YamdownDocument` type with explic
 Each example shows the source followed by the Markdown Yamdown produces. Pass
 YAML to `renderYamlMarkdown(source)`, or Markdown to
 `renderMarkdownDocument(parseMarkdownDocument(source))`.
+
+### Group content with named elements
+
+Use elements to wrap source material in named tags with attributes. Elements can
+nest and contain structured blocks or trusted raw Markdown.
+
+```yaml
+blocks:
+  - element:
+      name: context
+      attrs:
+        id: release-brief
+      blocks:
+        - h2: Release context
+        - element:
+            name: document
+            attrs:
+              source: notes.md
+            blocks:
+              - p: Added **table support** and improved validation.
+```
+
+```md
+<context id="release-brief">
+
+## Release context
+
+<document source="notes.md">
+
+Added **table support** and improved validation.
+
+</document>
+
+</context>
+```
+
+Attributes accept strings, finite numbers, and booleans; their names are sorted
+and values are escaped and quoted. Tags remain in the output, and Markdown
+viewers interpret them according to HTML rules. See
+[Elements with attributes](FORMAT.md#elements-with-attributes) for the full syntax
+and parsing behavior.
+
+### Generate a release checklist
+
+Combine document metadata with task-list state. Set `checked` to `true` or `false`
+for a checkbox, or omit it for an ordinary list item.
+
+```yaml
+frontmatter:
+  title: Release checklist
+blocks:
+  - h2: Before publishing
+  - type: list
+    ordered: false
+    items:
+      - checked: true
+        blocks:
+          - p: Update the changelog
+      - checked: false
+        blocks:
+          - p: Publish the package
+```
+
+```md
+---
+title: Release checklist
+---
+
+## Before publishing
+
+- [x] Update the changelog
+- [ ] Publish the package
+```
 
 ### Turn data into a table
 
