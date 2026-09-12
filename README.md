@@ -222,7 +222,7 @@ Added **table support** and improved validation.
 </context>
 ```
 
-Attributes accept strings, finite numbers, and booleans; their names are sorted
+Attributes accept strings, numbers, and booleans; their names are sorted
 and values are escaped and quoted. Tags remain in the output, and Markdown
 viewers interpret them according to HTML rules. See
 [Elements with attributes](FORMAT.md#elements-with-attributes) for the full syntax
