@@ -2,6 +2,7 @@ name: Release
 
 env:
   NODE_VERSION: 24
+  NPM_VERSION: 11.19.1
 
 on:
   push:
@@ -73,11 +74,12 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
+      - name: Setup npm with staged publishing
+        run: npm install --global "npm@$NPM_VERSION"
+
       - name: Check version and existing publication
         id: version
         shell: bash
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
         run: |
           node --input-type=module <<'NODE'
           import { execFileSync } from 'node:child_process';
@@ -97,7 +99,6 @@ jobs:
             { signal: AbortSignal.timeout(30_000) }
           );
           let stage = true;
-          let checkoutTag = false;
           if (response.ok) {
             const published = await response.json();
             if (!tagExists || published.gitHead !== tagCommit) {
@@ -106,42 +107,18 @@ jobs:
             stage = false;
           } else if (response.status !== 404) {
             throw new Error(`npm registry lookup failed: HTTP ${response.status}`);
-          } else if (tagExists) {
-            const releaseResponse = await fetch(
-              `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/releases/tags/${encodeURIComponent(tag)}`,
-              {
-                headers: {
-                  Accept: 'application/vnd.github+json',
-                  Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-                  'X-GitHub-Api-Version': '2022-11-28'
-                },
-                signal: AbortSignal.timeout(30_000)
-              }
-            );
-            if (releaseResponse.ok) {
-              stage = false;
-            } else if (releaseResponse.status === 404) {
-              checkoutTag = true;
-            } else {
-              throw new Error(`GitHub release lookup failed: HTTP ${releaseResponse.status}`);
-            }
+          } else if (tagExists && tagCommit !== process.env.GITHUB_SHA) {
+            throw new Error('The version tag points to another commit. Rerun that release or bump the version.');
           }
 
           appendFileSync(process.env.GITHUB_OUTPUT, [
             `tag=${tag}`,
             `tag_exists=${tagExists}`,
-            `checkout_tag=${checkoutTag}`,
             `stage=${stage}`,
             `prerelease=${pkg.version.includes('-')}`,
             ''
           ].join('\n'));
           NODE
-
-      - name: Checkout tagged version for recovery
-        if: steps.version.outputs.checkout_tag == 'true'
-        env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-        run: git checkout --detach "$RELEASE_TAG"
 
       - *install_dependencies_step
 
