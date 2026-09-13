@@ -49,7 +49,7 @@ jobs:
         run: pnpm run pack:check
 
   publish:
-    name: Tag, publish, and create release
+    name: Tag, stage, and create release
     needs: validate
     # Validate private repositories without publishing their contents to npm.
     if: github.event.repository.private == false
@@ -69,10 +69,9 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
+          check-latest: true
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-
-      - *install_dependencies_step
 
       - name: Check version and existing publication
         id: version
@@ -95,13 +94,13 @@ jobs:
             `https://registry.npmjs.org/${encodeURIComponent(pkg.name)}/${encodeURIComponent(pkg.version)}`,
             { signal: AbortSignal.timeout(30_000) }
           );
-          let publish = true;
+          let stage = true;
           if (response.ok) {
             const published = await response.json();
             if (!tagExists || published.gitHead !== tagCommit) {
               throw new Error('The npm version does not match its git tag. Bump package.json to a new version.');
             }
-            publish = false;
+            stage = false;
           } else if (response.status !== 404) {
             throw new Error(`npm registry lookup failed: HTTP ${response.status}`);
           } else if (tagExists && tagCommit !== process.env.GITHUB_SHA) {
@@ -111,11 +110,13 @@ jobs:
           appendFileSync(process.env.GITHUB_OUTPUT, [
             `tag=${tag}`,
             `tag_exists=${tagExists}`,
-            `publish=${publish}`,
+            `stage=${stage}`,
             `prerelease=${pkg.version.includes('-')}`,
             ''
           ].join('\n'));
           NODE
+
+      - *install_dependencies_step
 
       - name: Tag version
         if: steps.version.outputs.tag_exists == 'false'
@@ -127,15 +128,14 @@ jobs:
           git tag -a "$RELEASE_TAG" "$GITHUB_SHA" -m "$RELEASE_TAG"
           git push origin "refs/tags/$RELEASE_TAG"
 
-      - name: Publish to npm
-        if: steps.version.outputs.publish == 'true'
+      - name: Stage package on npm
+        if: steps.version.outputs.stage == 'true'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           PRERELEASE: ${{ steps.version.outputs.prerelease }}
         run: |
           dist_tag=latest
           if [[ "$PRERELEASE" == 'true' ]]; then dist_tag=next; fi
-          npm publish --access public --provenance --tag "$dist_tag"
+          npm stage publish --access public --provenance --tag "$dist_tag"
 
       - name: Create GitHub release
         env:

@@ -36,10 +36,10 @@ The Markdown annotation format is a preview. YAML authoring remains supported.
 
 ## Requirements
 
-- **Node.js 24.11.0 or later** for the library and CLI.
+- **Node.js 24 or later** for the library and CLI.
 - **ES modules** for library imports: use an `.mjs` file or set `"type": "module"`
   in your project. There is no CommonJS `require` entry point.
-- **pnpm 12.3.4** to build and test the checkout, as pinned in `package.json`.
+- **pnpm 12** to build and test the checkout, as pinned in `package.json`.
   TypeScript is optional for consumers; the package includes type declarations.
 
 ## Supported features
