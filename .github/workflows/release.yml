@@ -2,7 +2,6 @@ name: Release
 
 env:
   NODE_VERSION: 24
-  NPM_VERSION: 11.19.1
 
 on:
   push:
@@ -73,9 +72,6 @@ jobs:
           check-latest: true
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
-
-      - name: Setup npm with staged publishing
-        run: npm install --global "npm@$NPM_VERSION"
 
       - name: Check version and existing publication
         id: version
