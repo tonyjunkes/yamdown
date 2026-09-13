@@ -7,7 +7,7 @@ Local plans and specs may be in gitignored `docs/`.
 
 ## Commands
 
-Use pnpm (version pinned in `package.json`) and Node.js 24.11.0 or later.
+Use pnpm (version pinned in `package.json`) and Node.js 24 or later.
 CI runs tests, coverage, and package checks on Node.js 24.
 
 | Task                   | Command                              |
